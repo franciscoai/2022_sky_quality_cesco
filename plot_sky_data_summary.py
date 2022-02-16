@@ -17,8 +17,8 @@ __email__ = "franciscoaiglesias@gmail.com"
 Plots sky conditions summary data from Carlos Francille
 """
 REPO_PATH = os.getcwd()
-HASTAF = REPO_PATH + '/data/HASTA_Stats_summary.txt'
-MICAF = REPO_PATH + '/data/MICA_Stats_summary.txt'
+HASTAF = REPO_PATH + '/data/hasta/HASTA_Stats_summary.txt'
+MICAF = REPO_PATH + '/data/mica/MICA_Stats_summary.txt'
 OPATH = REPO_PATH + '/output'
 NOYH = 12  # number of years
 NOYM = 16
