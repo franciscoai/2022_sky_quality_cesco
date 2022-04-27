@@ -19,7 +19,7 @@ Plots sky conditions summary data from Carlos Francille
 REPO_PATH = os.getcwd()
 HASTAF = REPO_PATH + '/data/hasta/HASTA_Stats_summary.txt'
 MICAF = REPO_PATH + '/data/mica/MICA_Stats_summary.txt'
-OPATH = REPO_PATH + '/output'
+OPATH = REPO_PATH + '/output/summary'
 NOYH = 12  # number of years
 NOYM = 16
 STRFMTS = '{:4.1f}'  # format string to print short decimal numbers
