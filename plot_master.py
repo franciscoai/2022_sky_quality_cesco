@@ -6,7 +6,7 @@ import os
 
 REPO_PATH = os.getcwd()
 path = REPO_PATH + '/data/master/2012_Master_wea.txt'
-OPATH = REPO_PATH + '/output/mica'  
+OPATH = REPO_PATH + '/output/master'  
 
 file = pd.read_fwf(path)
 file["DAY"] = pd.to_datetime(file["DAY"], format='%Y%m%d')
