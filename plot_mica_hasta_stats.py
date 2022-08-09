@@ -13,7 +13,7 @@ from datetime import datetime
 REPO_PATH = os.getcwd()
 HASTAF = REPO_PATH + '/data/hasta/HASTA_Stats_2009_2020.txt'
 MICAF = REPO_PATH + '/data/mica/MICA_Stats_1997_2012.txt'
-OPATH = REPO_PATH + '/output/gabriel'  # '/home/gabrielzucarelli/Escritorio/2022_sky_quality_cesco/data/hasta/out_hasta'
+OPATH = REPO_PATH + '/output/mica_hasta_stats'  # '/home/gabrielzucarelli/Escritorio/2022_sky_quality_cesco/data/hasta/out_hasta'
 REMOVE = {'length': 0.0, 'sunny_time': 0, 'cloudy_time': 0, 'T_ini': 0,
           'T_end': 0, 'sun': 0, 'clou': 0, 'good': 0, 'mod': 0, 'bad': 0}
 
