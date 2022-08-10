@@ -5,13 +5,17 @@ import datetime
 import os
 
 REPO_PATH = os.getcwd()
-path = REPO_PATH + '/data/master/2012_Master_wea.txt'
+path = REPO_PATH + '/data/master'
 OPATH = REPO_PATH + '/output/master'  
 
+# create opath
+os.makedirs(OPATH, exist_ok=True)
+
+# read all files in path
 file = pd.read_fwf(path)
-file["DAY"] = pd.to_datetime(file["DAY"], format='%Y%m%d')
+file["DAY"] = pd.to_datetime(file["DAY"]+'T'+file["Hour"], format='%Y%m%dT%H:%M:%S.s')
 
-
+#plot all columns using a for
 x = file["DAY"]
 y = file["Sky_T"]
 plt.scatter(x, y, c="red")
