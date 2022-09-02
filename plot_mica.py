@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-from cProfile import label
-from calendar import month
-from curses import color_content
+import pickle
 from lib2to3.pgen2.token import OP
 import os
+from textwrap import shorten
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
@@ -11,23 +10,30 @@ import pandas as pd
 from datetime import datetime
 from datetime import timedelta
 import copy
-import matplotlib.colors as mcolors
 from pyparsing import col
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.cluster import KMeans
 import matplotlib.dates as mdates
 import matplotlib.colors as colors
+from scipy.optimize import curve_fit
+from water_vapor import water_vapor
+
+
+def fit_func(x, a, b, c):
+    # to use in fits
+    return a*np.exp(x+b)+c
+
 
 REPO_PATH = os.getcwd()
-HASTAF = REPO_PATH + '/data/hasta/HASTA_Stats_2009_2020.txt'
-# 'Fig1'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = 'Fig1'# ['20120625', '20120626', '20120627']
-# other options are: 'Fig1' to plot the same day in all years
+# 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
+MICAF = 'mica_vs_master'  # 'mica_hourly'  # ['19990222']
+# other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']  # months to delete
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
+MASTER_DIR = REPO_PATH + '/data/master'
 OPATH = REPO_PATH + '/output/mica'
 COL_NAMES = ['Date', 'Sky_T', 'Sun_T']
-COL_UNITS = {'Date': '', 'Sky_T': ' [mV]', 'Sun_T': ' [mV]',
+COL_UNITS = {'Date': '', 'Sky_T': '', 'Sun_T': '',
              'sky_class': '', 'date_diff': '[s]'}  # units incl a blank space
 DEL_VAL = {'Sky_T': [], 'Sun_T': []}  # {'Sky_T': [4.91499996, 0.0], 'Sun_T': [0.0]}  # delete these values
 MIN_VAL = {'Sky_T': [], 'Sun_T': []}  # delet all values below these
@@ -42,16 +48,20 @@ matplotlib.rc('font', size=12)  # font size
 BWIDTH = 0.45
 DPI = 300.  # image dpi
 DATE_DIFF_LIM = [0, 50]  # date difference limit for the plot
+RECOMPUTE_SCALER = True  # Set to recompute the data scaler
+SCALER_FILE = REPO_PATH + '/output/mica/scaler.pckl'
 
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
 if MICAF is not None:
-    if MICAF == 'Fig1':
+    if MICAF == 'mica_hourly':
         allf = [str.split(i, '.')[0] for i in os.listdir(MICA_DIR)]
         allf = [i[4:8] for i in allf]
         # find daates that are in at least 14 years
         allf = [i for i in allf if allf.count(i) > 14]
         mf = [i for i in mf if i.split('/')[-1].split('.')[0][4:8] == allf[3]]
+    elif MICAF == 'mica_vs_master':
+        mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2012']]
     else:
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in MICAF]
 
@@ -65,6 +75,7 @@ for f in mf:
         df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
         df['Date'] = [datetime(int(yyyymmdd[0:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:8])) +
                       timedelta(hours=h) for h in df['Date']]
+        df['date_diff'] = df['Date'].diff().dt.total_seconds()
         df_all.append(df)
         tnf += 1
 
@@ -82,15 +93,25 @@ for key in MIN_VAL:
 
 # Normalizes
 if DO_NORM:
-    scaler = MinMaxScaler()
-    all_scaler = []
-    for var in COL_NAMES[1:]:
-        print('Normalization parameters for...', var)
-        df_all[var] = scaler.fit_transform(df_all[[var]])
-        all_scaler.append(scaler)
-        print('Max:', scaler.data_max_, 'Min:', scaler.data_min_)
-        EMP_CLASS[var] = scaler.transform(np.array(EMP_CLASS[var])[:, None]).flatten()
-        print('Normalized empirical limits: ', str(EMP_CLASS[var]))
+    if RECOMPUTE_SCALER and MICAF is None:
+        print('Generating and saving normalization parameters for...', COL_NAMES[1:])
+        scaler = MinMaxScaler()
+        df_all[COL_NAMES[1:]] = scaler.fit_transform(df_all[COL_NAMES[1:]])
+        with open(SCALER_FILE, 'wb') as handle:
+            pickle.dump(scaler, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    else:
+        print('Reading normalization parameters for...', COL_NAMES[1:])
+        with open(SCALER_FILE, 'rb') as handle:
+            scaler = pickle.load(handle)
+        df_all[COL_NAMES[1:]] = scaler.transform(df_all[COL_NAMES[1:]])
+    print('Data Max:', scaler.data_max_, 'Data Min:', scaler.data_min_,  'Scale:',
+          scaler.scale_,  'Range:', scaler.data_range_, 'Min:', scaler.min_)
+
+    lim = np.array([EMP_CLASS['Sky_T'], EMP_CLASS['Sun_T']])
+    lim = scaler.transform(lim)
+    EMP_CLASS['Sky_T'] = lim[:, 0]
+    EMP_CLASS['Sun_T'] = lim[:, 1]
+    print('Normalized empirical limits: ', EMP_CLASS)
 
 # Clustering
 if CLUSTERING_METHOD == 'kmeans':
@@ -121,12 +142,12 @@ elif CLUSTERING_METHOD == 'manual':
 COL_NAMES.append('sky_class')
 print('Points with sky_class==None:', len(df_all[df_all['sky_class'] == 'None']))
 
-# date difference between consecutive rows in seconds
+# sort by date
+df_all = df_all.sort_values(by='Date')
 COL_NAMES.append('date_diff')
-df_all['date_diff'] = df_all['Date'].diff().dt.total_seconds()
 
 # prints some info
-for var in np.array(COL_NAMES)[[0, 1, 2, 4]]:
+for var in np.array(COL_NAMES)[[1, 2, 4]]:
     print(var+'-------------:')
     print('Total number of files (days) read: %s' % tnf)
     print('Total number of data points: %s (%s days of net observation)' %
@@ -134,157 +155,326 @@ for var in np.array(COL_NAMES)[[0, 1, 2, 4]]:
     print('Mean: %s' % df_all[var].mean())
     print('Median: %s' % df_all[var].median())
     print('Std: %s' % df_all[var].std())
-    print('Min: %s' % df_all[var].min())
-    print('Max: %s' % df_all[var].max())
+    print('Min: %s at date %s' % (df_all[var].min(), df_all.loc[df_all[var].idxmin()]['Date']))
+    print('Max: %s at date %s' % (df_all[var].max(), df_all.loc[df_all[var].idxmin()]['Date']))
+    print('p90: %s' % np.nanpercentile(df_all[var], 90))
+    print('p99: %s' % np.nanpercentile(df_all[var], 99))
+    print('p10: %s' % np.nanpercentile(df_all[var], 10))
+    print('----------------------------------------------------')
 
 # Plots
 print('Plotting...')
 os.makedirs(OPATH, exist_ok=True)
-for var in COL_NAMES:
-    # vs date
-    y = df_all[var]
-    if var in ['Date', 'date_diff']:
-        x = np.arange(len(y))
-    else:
-        x = df_all["Date"]
-    plt.figure(figsize=[10, 6])
-    plt.scatter(x, y, c='r', marker='.', s=2)
-    if var == 'date_diff':
-        plt.ylim(DATE_DIFF_LIM)
-    plt.xlabel(df_all["Date"].name)
-    plt.ylabel(df_all[var].name + COL_UNITS[var])
-    plt.tight_layout()
-    plt.savefig(OPATH+'/'+var, dpi=DPI)
+if MICAF == 'mica_vs_master':
+    REMOVE = {"Sky_T": [-100], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
+              "C": [], "W": [], "R": [], "Cloud_T": [], "Date_diff": []}  # Max val
+    COL_NAMES_MASTER = ["DAY", "HOUR(UT)", "Sky_T", "Amb_T", "WindS", "Hum%",
+                        "DewP", "C", "W", "R", "Cloud_T", "Date_diff"]
+    mf = [os.path.join(MASTER_DIR, f) for f in os.listdir(MASTER_DIR) if f.endswith('_wea.txt')]
+    mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2012']]
+    df_master = []
+    for f in mf:
+        df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES_MASTER)
+        df["DAY"] = pd.to_datetime(df["DAY"], format="%Y%m%d")
+        df["HOUR(UT)"] = [timedelta(hours=h) for h in df['HOUR(UT)']]
+        df["Date"] = df["DAY"]+df["HOUR(UT)"]
+        df_master.append(df)
+    df_master = pd.concat(df_master, ignore_index=True)
+    df_master["Cloud_T"] = df_master["Sky_T"] - df_master["Amb_T"]
+    df_master["water_vapor"] = water_vapor(df_master["Amb_T"],df_master["Hum%"])
+    df_master["Date_diff"] = df_master["Date"].diff().dt.total_seconds()
+    # remove values
+    for var in COL_NAMES_MASTER[2:]:
+        for i in REMOVE[var]:
+            df_master = df_master.drop(df_master[df_master[var] < i].index)
 
-    if len(mf) < 20:
-        # vs hour of that day
-        fig = plt.figure(figsize=[10, 6])
-        for f in mf:
-            yyyymmdd = f.split('/')[-1].split('.')[0]
-            df = df_all[df_all['Date'].dt.strftime('%Y%m%d') == yyyymmdd]
-            x = [datetime.combine(datetime.today(), datetime.time(i)) for i in pd.to_datetime(
-                df['Date'])]
-            y = df[var]
-            plt.scatter(x, y, marker='.', s=1, label=yyyymmdd)
-            if var in EMP_CLASS:
-                plt.plot([min(x), max(x)], [EMP_CLASS[var][0], EMP_CLASS[var][0]], 'k-', linewidth=2)
-                plt.plot([min(x), max(x)], [EMP_CLASS[var][1], EMP_CLASS[var][1]], 'k-', linewidth=2)
-        plt.xlabel('Hour of the day')
+    # normalizes
+    scaler_master = MinMaxScaler()
+    tonorm = ['Sky_T', "Amb_T", "WindS", "Hum%", "DewP", "Cloud_T", "water_vapor"]
+    df_master[tonorm] = scaler_master.fit_transform(df_master[tonorm])
+
+    for var in tonorm:
+        # resamples master to mica times
+        # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Date"] #  df_all['Date']#  # sunny good and moderate only
+        interp_date = df_all['Date']
+        # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Sky_T"] #
+        interp_skyt = df_all['Sky_T'] # df_all.loc[(df_all['Date'].dt.month ==5), "Sun_T"] # df_all['Sky_T']
+        interp_cloudt = np.interp(interp_date, df_master["Date"], df_master[var])
+
+        # # scatter
+        # x = interp_cloudt
+        # y = interp_skyt
+        # plt.scatter(x, y, c='b', s=2)
+        # plt.xlabel(var)
+        # plt.ylabel('Sky_T')
+        # plt.legend()
+        # plt.tight_layout()
+        # plt.show()
+
+        # # 3d scatter
+        # y = df_all.loc[(df_all['Date'].dt.month == 2), "Sky_T"]
+        # z = interp_cloudt
+        # x = df_all.loc[(df_all['Date'].dt.month == 2), "Sun_T"]
+        # fig = plt.figure(figsize=[10, 10])
+        # ax = fig.add_subplot(111, projection='3d')
+        # ax.scatter3D(x, y, z, c='r', marker='.', s=2)
+        # ax.set_xlabel(df_all['Sun_T'].name)
+        # ax.set_ylabel(df_all['Sky_T'].name)
+        # ax.set_zlabel(var)
+        # plt.tight_layout()
+        # plt.show()
+
+    
+        # # 2d histogram with fit
+        if var in ['water_vapor']:
+
+
+            # vs Date
+            plt.figure(figsize=[10, 6])
+            x = interp_date
+            y = interp_cloudt
+            plt.scatter(x, y, c='g', s=2, label='intp_'+var)
+            y = interp_skyt
+            plt.scatter(x, y, c='b', s=2, label='Sky_T')
+            plt.xlim([min(x), max(x)])
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+            plt.figure(figsize=[8, 9])
+            x = interp_cloudt
+            y = interp_skyt
+            plt.hist2d(x, y, bins=NBINS, cmap='Greys', norm=matplotlib.colors.LogNorm())
+            # # fit
+            # if var in ['Cloud_T']:
+            #     optp, _ = curve_fit(fit_func, x, y, p0=[-1,60,1])
+            #     print(optp)
+            #     a, b, c = optp
+            #     x_line = np.arange(min(x), max(x), 1)
+            #     y_line = fit_func(x_line, a, b, c)
+            #     plt.plot(x_line, y_line, '--', color='red')
+
+            plt.xlabel('interp_'+var)
+            plt.ylabel('Sky_T')
+            plt.title('Correlation coef:' + str(np.corrcoef(x, y)))
+            plt.tight_layout()
+            plt.show()
+
+else:
+    for var in COL_NAMES:
+        # vs date
+        y = df_all[var]
+        if var in ['Date', 'date_diff']:
+            x = np.arange(len(y))
+        else:
+            x = df_all["Date"]
+        plt.figure(figsize=[10, 6])
+        plt.scatter(x, y, c='r', marker='.', s=2)
+        # if var == 'date_diff':
+        #    plt.ylim(DATE_DIFF_LIM)
+        plt.xlabel(df_all["Date"].name)
         plt.ylabel(df_all[var].name + COL_UNITS[var])
         plt.tight_layout()
-        plt.grid(True)
-        ax = plt.gca()
-        monthyearFmt = mdates.DateFormatter('%H:%M')
-        ax.xaxis.set_major_formatter(monthyearFmt)
-        if var == 'Sun_T':
-            #plt.ylim([0.4, 1])
-            lgnd = plt.legend(loc='lower right')
-            for handle in lgnd.legendHandles:
-                handle.set_sizes([40.0])
-        plt.savefig(OPATH+'/'+var+'_hour', dpi=DPI)
+        plt.savefig(OPATH+'/'+var, dpi=DPI)
+        plt.close()
 
-    # histograms
-    plt.figure(figsize=[10, 6])
-    if var == 'date_diff':
-        plt.hist(y, log=True, bins=np.arange(DATE_DIFF_LIM[1]), color='k', histtype='step')
-    else:
-        plt.hist(y, log=True, bins=NBINS, color='k', histtype='step')
-    if var in EMP_CLASS:
-        plt.plot([EMP_CLASS[var][0], EMP_CLASS[var][0]], [0, 4e6], 'k--', linewidth=2)
-        plt.plot([EMP_CLASS[var][1], EMP_CLASS[var][1]], [0, 4e6],  'k--', linewidth=2)
-    plt.grid()
-    plt.ylabel('number of cases')
-    plt.xlabel(df_all[var].name + COL_UNITS[var])
+        # vs hour of that day
+        if MICAF == 'mica_hourly':
+            fig = plt.figure(figsize=[10, 6])
+            for f in mf:
+                yyyymmdd = f.split('/')[-1].split('.')[0]
+                df = df_all[df_all['Date'].dt.strftime('%Y%m%d') == yyyymmdd]
+                x = [datetime.combine(datetime.today(), datetime.time(i)) for i in pd.to_datetime(
+                    df['Date'])]
+                y = df[var]
+                plt.scatter(x, y, marker='.', s=1, label=yyyymmdd)
+                if var in EMP_CLASS:
+                    plt.plot([min(x), max(x)], [EMP_CLASS[var][0], EMP_CLASS[var][0]], 'k-', linewidth=2)
+                    plt.plot([min(x), max(x)], [EMP_CLASS[var][1], EMP_CLASS[var][1]], 'k-', linewidth=2)
+            plt.xlabel('Hour of the day')
+            plt.ylabel(df_all[var].name + COL_UNITS[var])
+            plt.tight_layout()
+            plt.grid(True)
+            ax = plt.gca()
+            monthyearFmt = mdates.DateFormatter('%H:%M')
+            ax.xaxis.set_major_formatter(monthyearFmt)
+            if var == 'Sun_T':
+                #plt.ylim([0.4, 1])
+                lgnd = plt.legend(loc='lower right')
+                for handle in lgnd.legendHandles:
+                    handle.set_sizes([40.0])
+            plt.savefig(OPATH+'/'+var+'_hour', dpi=DPI)
+            plt.close()
+
+        # histograms
+        plt.figure(figsize=[10, 6])
+        if var == 'date_diff':
+            plt.hist(y, log=True, bins=np.arange(DATE_DIFF_LIM[1]), color='k', histtype='step')
+        else:
+            plt.hist(y, log=True, bins=NBINS, color='k', histtype='step')
+        if var in EMP_CLASS:
+            plt.plot([EMP_CLASS[var][0], EMP_CLASS[var][0]], [0, 4e6], 'k--', linewidth=2)
+            plt.plot([EMP_CLASS[var][1], EMP_CLASS[var][1]], [0, 4e6],  'k--', linewidth=2)
+        plt.grid()
+        plt.ylabel('number of cases')
+        plt.xlabel(df_all[var].name + COL_UNITS[var])
+        plt.tight_layout()
+        plt.savefig(OPATH+'/'+var+'_hist', dpi=DPI)
+        plt.close()
+
+    # 2d scatter
+    plt.figure(figsize=[10, 10])
+    for i in range(N_CLUSTERS):
+        y = df_all[df_all['sky_class'] == CLUSTERS[i]]['Sky_T']
+        x = df_all[df_all['sky_class'] == CLUSTERS[i]]['Sun_T']
+        plt.scatter(x, y, c=CLUSTERS_COLOR[i], marker='.', s=0.1, label=CLUSTERS[i])
+        plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][0], EMP_CLASS['Sky_T'][0]], 'k--', linewidth=2)
+        plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][1], EMP_CLASS['Sky_T'][1]], 'k--', linewidth=2)
+        plt.plot([EMP_CLASS['Sun_T'][0], EMP_CLASS['Sun_T'][1]], [min(y), max(y)], 'k--', linewidth=2)
+    if km is not None:
+        plt.scatter(km.cluster_centers_[:, 0], km.cluster_centers_[:, 1], color='b', marker='*', s=100)
+    plt.xlabel(df_all['Sun_T'].name + COL_UNITS['Sun_T'])
+    plt.ylabel(df_all['Sky_T'].name + COL_UNITS['Sky_T'])
     plt.tight_layout()
-    plt.savefig(OPATH+'/'+var+'_hist', dpi=DPI)
+    plt.savefig(OPATH+'/Sky_T_vs_Sun_T', dpi=DPI)
+    plt.close()
 
-# 2d scatter
-plt.figure(figsize=[10, 10])
-for i in range(N_CLUSTERS):
-    y = df_all[df_all['sky_class'] == CLUSTERS[i]]['Sky_T']
-    x = df_all[df_all['sky_class'] == CLUSTERS[i]]['Sun_T']
-    plt.scatter(x, y, c=CLUSTERS_COLOR[i], marker='.', s=0.1, label=CLUSTERS[i])
+    # 2d histogram
+    plt.figure(figsize=[8, 9])
+    y = df_all['Sky_T']
+    x = df_all['Sun_T']
+    w = df_all['date_diff']/3600.
+    hist, xbins, ybins = np.histogram2d(x, y, bins=NBINS, weights=w)
+    plt.imshow(hist.T, extent=[min(xbins), max(xbins), min(ybins), max(ybins)],
+               origin='lower', norm=colors.LogNorm(vmin=5./60., vmax=30*24), cmap='Greys')
+    plt.colorbar(label='Total time [h]')
+    if km is not None:
+        plt.scatter(km.cluster_centers_[:, 0], km.cluster_centers_[:, 1], color='b', marker='*', s=100)
     plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][0], EMP_CLASS['Sky_T'][0]], 'k--', linewidth=2)
     plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][1], EMP_CLASS['Sky_T'][1]], 'k--', linewidth=2)
     plt.plot([EMP_CLASS['Sun_T'][0], EMP_CLASS['Sun_T'][1]], [min(y), max(y)], 'k--', linewidth=2)
-if km is not None:
-    plt.scatter(km.cluster_centers_[:, 0], km.cluster_centers_[:, 1], color='b', marker='*', s=100)
-plt.xlabel(df_all['Sun_T'].name + COL_UNITS['Sun_T'])
-plt.ylabel(df_all['Sky_T'].name + COL_UNITS['Sky_T'])
-plt.tight_layout()
-plt.savefig(OPATH+'/Sky_T_vs_Sun_T', dpi=DPI)
+    plt.xlabel(df_all['Sun_T'].name + COL_UNITS['Sun_T'])
+    plt.ylabel(df_all['Sky_T'].name + COL_UNITS['Sky_T'])
+    plt.tight_layout()
+    plt.savefig(OPATH+'/Sky_T_vs_Sun_T_hist', dpi=DPI)
+    plt.close()
 
-# 2d histogram
-plt.figure(figsize=[8, 9])
-y = df_all['Sky_T']
-x = df_all['Sun_T']
-hist, xbins, ybins = np.histogram2d(x, y, bins=NBINS)
-plt.imshow(hist.T*(5./3600.), extent=[min(xbins), max(xbins), min(ybins), max(ybins)],
-           origin='lower', norm=colors.LogNorm(vmin=5./60., vmax=30*24), cmap='Greys')
-plt.colorbar(label='Total time [h]')
-if km is not None:
-    plt.scatter(km.cluster_centers_[:, 0], km.cluster_centers_[:, 1], color='b', marker='*', s=100)
-plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][0], EMP_CLASS['Sky_T'][0]], 'k--', linewidth=2)
-plt.plot([EMP_CLASS['Sun_T'][0], max(x)], [EMP_CLASS['Sky_T'][1], EMP_CLASS['Sky_T'][1]], 'k--', linewidth=2)
-plt.plot([EMP_CLASS['Sun_T'][0], EMP_CLASS['Sun_T'][1]], [min(y), max(y)], 'k--', linewidth=2)
-plt.xlabel(df_all['Sun_T'].name + COL_UNITS['Sun_T'])
-plt.ylabel(df_all['Sky_T'].name + COL_UNITS['Sky_T'])
-plt.tight_layout()
-plt.savefig(OPATH+'/Sky_T_vs_Sun_T_hist', dpi=DPI)
+    # plots bars of sky-class per year
+    plt.figure(figsize=[10, 8])
+    years = df_all['Date'].dt.year.unique()
+    n0 = None
+    print('sky_class_per_year:')
+    print(years)
+    for i in range(len(CLUSTERS)):
+        n = []
+        for y in years:
+            # total time in all CLUSTERs per year
+            tot = df_all.loc[df_all['Date'].dt.year == y, 'date_diff'].sum()
+            # print(tot)
+            if tot == 0:
+                tot = 1
+            n.append(df_all.loc[(df_all['sky_class'] == CLUSTERS[i]) & (
+                df_all['Date'].dt.year == y), 'date_diff'].sum()/tot*100.)
+        plt.bar(years, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=3, bottom=n0)
+        print(CLUSTERS[i], n)
+        if n0 is None:
+            n0 = np.array(n)
+        else:
+            n0 += np.array(n)
+    plt.legend()
+    plt.grid()
+    plt.xlabel('year')
+    plt.ylabel('$\%$ of observed time')
+    plt.tight_layout()
+    plt.savefig(OPATH+'/sky_class_per_year', dpi=DPI)
+    plt.close()
 
-# plots bars of sky-class per year
-plt.figure(figsize=[10, 8])
-years = df_all['Date'].dt.year.unique()
-n0 = None
-print('sky_class_per_year:')
-print(years)
-for i in range(len(CLUSTERS)):
-    n = []
-    for y in years:
-        # total number of elements in all CLUSTERs per year
-        tot = len(df_all[df_all['Date'].dt.year == y])
-        if tot == 0:
-            tot = 1
-        n.append(len(df_all[(df_all['sky_class'] == CLUSTERS[i]) & (
-            df_all['Date'].dt.year == y)])*5./3600.)  # /tot*100.)
-    plt.bar(years, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=3, bottom=n0)
-    print(CLUSTERS[i], n)
-    if n0 is None:
-        n0 = np.array(n)
-    else:
-        n0 += np.array(n)
-plt.legend()
-plt.grid()
-plt.xlabel('year')
-plt.ylabel('$\%$ of observed time')
-plt.tight_layout()
-plt.savefig(OPATH+'/sky_class_per_year', dpi=DPI)
+    # plots bars of sky-class per month
+    plt.figure(figsize=[10, 8])
+    months = df_all['Date'].dt.month.unique()
+    n0 = None
+    print('sky_class_per_month:')
+    print(months)
+    for i in range(len(CLUSTERS)):
+        n = []
+        for m in months:
+            # total time in all CLUSTERs per year
+            tot = df_all.loc[df_all['Date'].dt.month == m, 'date_diff'].sum()
+            # print(tot)
+            if tot == 0:
+                tot = 1
+            n.append(df_all.loc[(df_all['sky_class'] == CLUSTERS[i]) & (
+                df_all['Date'].dt.month == m), 'date_diff'].sum()/tot*100.)
+        plt.bar(months, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=3, bottom=n0)
+        print(CLUSTERS[i], n)
+        if n0 is None:
+            n0 = np.array(n)
+        else:
+            n0 += np.array(n)
+    plt.legend()
+    plt.grid()
+    plt.xlabel('month')
+    plt.ylabel('$\%$ of observed time')
+    plt.tight_layout()
+    plt.savefig(OPATH+'/sky_class_per_month', dpi=DPI)
+    plt.close()
 
-# plots bars of sky-class per year only of sunny time (not clouds)
-print('sky_class_per_year_sunny_time:')
-print(years)
-plt.figure(figsize=[10, 8])
-years = df_all['Date'].dt.year.unique()
-n0 = None
-for i in range(len(CLUSTERS)-1):
-    n = []
-    for y in years:
-        # total number of elements in CLUSTER[0:2] per year
-        tot = len(df_all[(df_all['sky_class'] != CLUSTERS[3]) & (df_all['Date'].dt.year == y)])
-        if tot == 0:
-            tot = 1
-        n.append(len(df_all[(df_all['sky_class'] == CLUSTERS[i]) & (
-            df_all['Date'].dt.year == y)])*5./3600.)  # /tot*100.)
-    plt.bar(years, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=0, bottom=n0)
-    # plt.plot(years,np.zeros(len(n))+np.mean(n),'--',color=CLUSTERS_COLOR[i] ,linewidth=4,zorder=1)
-    if n0 is None:
-        n0 = np.array(n)
-    else:
-        n0 += np.array(n)
-    print(CLUSTERS[i], n)
-plt.legend()
-plt.grid()
-plt.xlabel('year')
-plt.ylabel('$\%$ of Sunny time')
-plt.tight_layout()
-plt.savefig(OPATH+'/sky_class_per_year_sunny_time', dpi=DPI)
+    # plots bars of sky-class per year only of sunny time (no clouds)
+    print('sky_class_per_year_sunny_time:')
+    print(years)
+    plt.figure(figsize=[10, 8])
+    years = df_all['Date'].dt.year.unique()
+    n0 = None
+    for i in range(len(CLUSTERS)-1):
+        n = []
+        for y in years:
+            # total number of elements in CLUSTER[0:2] per year
+            tot = df_all.loc[(df_all['sky_class'] != CLUSTERS[3]) & (df_all['Date'].dt.year == y), 'date_diff'].sum()
+            if tot == 0:
+                tot = 1
+            n.append(df_all.loc[(df_all['sky_class'] == CLUSTERS[i]) & (
+                df_all['Date'].dt.year == y), 'date_diff'].sum()/tot*100.)
+        plt.bar(years, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=0, bottom=n0)
+        # plt.plot(years,np.zeros(len(n))+np.mean(n),'--',color=CLUSTERS_COLOR[i] ,linewidth=4,zorder=1)
+        if n0 is None:
+            n0 = np.array(n)
+        else:
+            n0 += np.array(n)
+        print(CLUSTERS[i], n)
+    plt.legend()
+    plt.grid()
+    plt.xlabel('year')
+    plt.ylabel('$\%$ of Sunny time')
+    plt.tight_layout()
+    plt.savefig(OPATH+'/sky_class_per_year_sunny_time', dpi=DPI)
+    plt.close()
+
+    # plots bars of sky-class per month only of sunny time (no clouds)
+    print('sky_class_per_month_sunny_time:')
+    print(months)
+    plt.figure(figsize=[10, 8])
+    months = df_all['Date'].dt.month.unique()
+    n0 = None
+    for i in range(len(CLUSTERS)-1):
+        n = []
+        for m in months:
+            # total number of elements in CLUSTER[0:2] per month
+            tot = df_all.loc[(df_all['sky_class'] != CLUSTERS[3]) & (df_all['Date'].dt.month == m), 'date_diff'].sum()
+            if tot == 0:
+                tot = 1
+            n.append(df_all.loc[(df_all['sky_class'] == CLUSTERS[i]) & (
+                df_all['Date'].dt.month == m), 'date_diff'].sum()/tot*100.)
+        plt.bar(months, n, color=CLUSTERS_COLOR[i], label=CLUSTERS[i], zorder=0, bottom=n0)
+        # plt.plot(months,np.zeros(len(n))+np.mean(n),'--',color=CLUSTERS_COLOR[i] ,linewidth=4,zorder=1)
+        if n0 is None:
+            n0 = np.array(n)
+        else:
+            n0 += np.array(n)
+        print(CLUSTERS[i], n)
+    plt.legend()
+    plt.grid()
+    plt.xlabel('month')
+    plt.ylabel('$\%$ of Sunny time')
+    plt.tight_layout()
+    plt.savefig(OPATH+'/sky_class_per_month_sunny_time', dpi=DPI)
+    plt.close()

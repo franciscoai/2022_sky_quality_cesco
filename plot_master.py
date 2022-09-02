@@ -3,22 +3,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import os
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
-
+from water_vapor import water_vapor
 
 REPO_PATH = os.getcwd()
 path = REPO_PATH + '/data/master'
 OPATH = REPO_PATH + '/output/master'
-
-COL_NAMES = ["DAY","HOUR(UT)","Sky_T","Amb_T","WindS","Hum%","DewP","C", "W", "R", "Cloud_T","DATE_DIF"]  
+DAY_TIME=[datetime.time(hour=10,minute=0),datetime.time(hour=22,minute=0)] # daytime interval
+COL_NAMES = ["DAY","HOUR(UT)","Sky_T","Amb_T","WindS","Hum%","DewP","C", "W", "R", "Cloud_T","DATE_DIF","water_vapor"]  
 NBINS = 50
-REMOVE =  {"Sky_T":[-990],"Amb_T":[],"WindS":[],"Hum%":[],"DewP":[],"C":[], "W":[], "R":[], "Cloud_T": [],"DATE_DIF":[]}
+REMOVE =  {"Sky_T":[-990],"Amb_T":[],"WindS":[],"Hum%":[],"DewP":[],"C":[], "W":[], "R":[], "Cloud_T": [],"DATE_DIF":[],"water_vapor":[]}
 
 # create opath
 os.makedirs(OPATH, exist_ok=True)
-mf = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.txt')]
-mf.remove("/gehme/projects/2022_sky_quality_cesco/2022_sky_quality_cesco/data/master/MASTER_Stats.txt")
+mf = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
 
 #reading all files and converting to datetime
 df_all = []
@@ -31,8 +28,8 @@ for f in mf:
 df_all = pd.concat(df_all, ignore_index=True)
 
 df_all["Cloud_T"] =  df_all["Sky_T"] - df_all["Amb_T"]
+df_all["water_vapor"] = water_vapor(df_all["Amb_T"],df_all["Hum%"])
 df_all["DATE_DIF"] = df_all["DATE"].diff().dt.total_seconds()
-print(df_all["DATE_DIF"])
 
 for var in COL_NAMES[2:]:
     for i in REMOVE[var]:    
@@ -41,8 +38,7 @@ for var in COL_NAMES[2:]:
        
 print("Creating Images...")
 
-
-#plot all columns using a for
+#plot all columns
 for variable in COL_NAMES[2:]:
     # vs date
     x = df_final["DATE"]
