@@ -17,6 +17,7 @@ import matplotlib.dates as mdates
 import matplotlib.colors as colors
 from scipy.optimize import curve_fit
 from water_vapor import water_vapor
+import pysolar.solar as solar
 
 
 def fit_func(x, a, b, c):
@@ -26,7 +27,7 @@ def fit_func(x, a, b, c):
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = 'mica_vs_master'  # 'mica_hourly'  # ['19990222']
+MICAF ='mica_vs_master'# 'mica_hourly' #'mica_vs_master'  # 'mica_hourly'  # ['19990222']
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']  # months to delete
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
@@ -35,7 +36,7 @@ OPATH = REPO_PATH + '/output/mica'
 COL_NAMES = ['Date', 'Sky_T', 'Sun_T']
 COL_UNITS = {'Date': '', 'Sky_T': '', 'Sun_T': '',
              'sky_class': '', 'date_diff': '[s]'}  # units incl a blank space
-DEL_VAL = {'Sky_T': [], 'Sun_T': []}  # {'Sky_T': [4.91499996, 0.0], 'Sun_T': [0.0]}  # delete these values
+DEL_VAL = {'Sky_T': [4.91499996], 'Sun_T': []}  # {'Sky_T': [4.91499996, 0.0], 'Sun_T': [0.0]}  # delete these values
 MIN_VAL = {'Sky_T': [], 'Sun_T': []}  # delet all values below these
 NBINS = 50  # his num of bin
 CLUSTERS = ['Sunny Good', 'Sunny Moderate', 'Sunny Bad', 'Cloudy']
@@ -50,6 +51,7 @@ DPI = 300.  # image dpi
 DATE_DIFF_LIM = [0, 50]  # date difference limit for the plot
 RECOMPUTE_SCALER = True  # Set to recompute the data scaler
 SCALER_FILE = REPO_PATH + '/output/mica/scaler.pckl'
+OAFA_LOC=[-31+48/60.+8.5/3600,-69+19/60.+35.6/3600., 2370.] # oafa location lat, long, height [m]
 
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
@@ -196,9 +198,9 @@ if MICAF == 'mica_vs_master':
     for var in tonorm:
         # resamples master to mica times
         # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Date"] #  df_all['Date']#  # sunny good and moderate only
-        interp_date = df_all['Date']
+        interp_date = df_all.loc[(df_all['Date'].dt.month ==2), "Date"] # df_all['Sky_T']# df_all['Date']
         # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Sky_T"] #
-        interp_skyt = df_all['Sky_T'] # df_all.loc[(df_all['Date'].dt.month ==5), "Sun_T"] # df_all['Sky_T']
+        interp_skyt = df_all.loc[(df_all['Date'].dt.month ==2), "Sun_T"] # df_all['Sky_T'] #df_all['Sky_T']
         interp_cloudt = np.interp(interp_date, df_master["Date"], df_master[var])
 
         # # scatter
@@ -227,8 +229,6 @@ if MICAF == 'mica_vs_master':
     
         # # 2d histogram with fit
         if var in ['water_vapor']:
-
-
             # vs Date
             plt.figure(figsize=[10, 6])
             x = interp_date
@@ -244,7 +244,7 @@ if MICAF == 'mica_vs_master':
             plt.figure(figsize=[8, 9])
             x = interp_cloudt
             y = interp_skyt
-            plt.hist2d(x, y, bins=NBINS, cmap='Greys', norm=matplotlib.colors.LogNorm())
+            plt.hist2d(x, y, bins=NBINS, cmap='Greys')#, norm=matplotlib.colors.LogNorm())
             # # fit
             # if var in ['Cloud_T']:
             #     optp, _ = curve_fit(fit_func, x, y, p0=[-1,60,1])
@@ -305,6 +305,13 @@ else:
                     handle.set_sizes([40.0])
             plt.savefig(OPATH+'/'+var+'_hour', dpi=DPI)
             plt.close()
+
+            # vs air mass
+            print(OAFA_LOC)
+            date = datetime(2007, 2, 18, 15, 13, 1, 130320, tzinfo=timezone.utc)
+            altitude_deg = solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1], date)
+            solar.radiation.get_radiation_direct(date, altitude_deg)
+            breakpoint()
 
         # histograms
         plt.figure(figsize=[10, 6])
