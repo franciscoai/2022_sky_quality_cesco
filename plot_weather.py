@@ -127,7 +127,7 @@ for i in variables:
     std_y = []
     for y in years:
         total = df_weather.loc[df_weather['DATE_TIME'].dt.year == y, i]
-        median_y.append(total.median())
+        median_y.append(total.mean())
         std_y.append(total.std())
     ax2 = plt.subplot(1, 3, 2)
     nyear = np.arange(len(years))
