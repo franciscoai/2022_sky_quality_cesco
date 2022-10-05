@@ -27,31 +27,32 @@ def fit_func(x, a, b, c):
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF ='mica_vs_master'# 'mica_hourly' #'mica_vs_master'  # 'mica_hourly'  # ['19990222']
+MICAF = 'mica_calibration'  # 'mica_vs_master'# 'mica_hourly' #'mica_vs_master'  # 'mica_hourly'  # ['19990222']
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']  # months to delete
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
 MASTER_DIR = REPO_PATH + '/data/master'
 OPATH = REPO_PATH + '/output/mica'
 COL_NAMES = ['Date', 'Sky_T', 'Sun_T']
-COL_UNITS = {'Date': '', 'Sky_T': '', 'Sun_T': '',
+COL_UNITS = {'Date': '', 'Sky_T': '', 'Sun_T': '', 'Sky_T_over_Sun_T': '',
              'sky_class': '', 'date_diff': '[s]'}  # units incl a blank space
-DEL_VAL = {'Sky_T': [4.91499996], 'Sun_T': []}  # {'Sky_T': [4.91499996, 0.0], 'Sun_T': [0.0]}  # delete these values
-MIN_VAL = {'Sky_T': [], 'Sun_T': []}  # delet all values below these
+DEL_VAL = {'Sky_T': [4.91499996], 'Sun_T': [], 'Sky_T_over_Sun_T':[]}  # {'Sky_T': [4.91499996, 0.0], 'Sun_T': [0.0]}  # delete these values
+MIN_VAL = {'Sky_T': [], 'Sun_T': [], 'Sky_T_over_Sun_T':[]}  # delet all values below these
 NBINS = 50  # his num of bin
 CLUSTERS = ['Sunny Good', 'Sunny Moderate', 'Sunny Bad', 'Cloudy']
 CLUSTERING_METHOD = 'manual'  # 'kmeans' or 'manual'
 N_CLUSTERS = len(CLUSTERS)  # Number of clusters to clasiffy the sky
 CLUSTERS_COLOR = ['g', 'orange', 'r', 'k']
 EMP_CLASS = {'Sky_T': [1, 2], 'Sun_T': [2, 2]}  # empirical limits for sky classes in mV
-DO_NORM = True  # normalize the data
+DO_NORM = False  # normalize the data
 matplotlib.rc('font', size=12)  # font size
 BWIDTH = 0.45
 DPI = 300.  # image dpi
 DATE_DIFF_LIM = [0, 50]  # date difference limit for the plot
 RECOMPUTE_SCALER = True  # Set to recompute the data scaler
 SCALER_FILE = REPO_PATH + '/output/mica/scaler.pckl'
-OAFA_LOC=[-31+48/60.+8.5/3600,-69+19/60.+35.6/3600., 2370.] # oafa location lat, long, height [m]
+OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
+MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
 
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
@@ -64,6 +65,9 @@ if MICAF is not None:
         mf = [i for i in mf if i.split('/')[-1].split('.')[0][4:8] == allf[3]]
     elif MICAF == 'mica_vs_master':
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2012']]
+    elif MICAF == 'mica_calibration':
+        mf_cal = os.listdir(MICA_CAL_DIR)
+        mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in mf_cal]
     else:
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in MICAF]
 
@@ -144,6 +148,10 @@ elif CLUSTERING_METHOD == 'manual':
 COL_NAMES.append('sky_class')
 print('Points with sky_class==None:', len(df_all[df_all['sky_class'] == 'None']))
 
+# adds column with Sky_T_over_Sun_T
+df_all['Sky_T_over_Sun_T'] = df_all['Sky_T']/df_all['Sun_T']
+COL_NAMES.append('Sky_T_over_Sun_T')
+
 # sort by date
 df_all = df_all.sort_values(by='Date')
 COL_NAMES.append('date_diff')
@@ -183,7 +191,7 @@ if MICAF == 'mica_vs_master':
         df_master.append(df)
     df_master = pd.concat(df_master, ignore_index=True)
     df_master["Cloud_T"] = df_master["Sky_T"] - df_master["Amb_T"]
-    df_master["water_vapor"] = water_vapor(df_master["Amb_T"],df_master["Hum%"])
+    df_master["water_vapor"] = water_vapor(df_master["Amb_T"], df_master["Hum%"])
     df_master["Date_diff"] = df_master["Date"].diff().dt.total_seconds()
     # remove values
     for var in COL_NAMES_MASTER[2:]:
@@ -198,9 +206,9 @@ if MICAF == 'mica_vs_master':
     for var in tonorm:
         # resamples master to mica times
         # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Date"] #  df_all['Date']#  # sunny good and moderate only
-        interp_date = df_all.loc[(df_all['Date'].dt.month ==2), "Date"] # df_all['Sky_T']# df_all['Date']
+        interp_date = df_all.loc[(df_all['Date'].dt.month == 2), "Date"]  # df_all['Sky_T']# df_all['Date']
         # df_all.loc[(df_all['sky_class'] != CLUSTERS[2]) & (df_all['sky_class'] != CLUSTERS[3]), "Sky_T"] #
-        interp_skyt = df_all.loc[(df_all['Date'].dt.month ==2), "Sun_T"] # df_all['Sky_T'] #df_all['Sky_T']
+        interp_skyt = df_all.loc[(df_all['Date'].dt.month == 2), "Sun_T"]  # df_all['Sky_T'] #df_all['Sky_T']
         interp_cloudt = np.interp(interp_date, df_master["Date"], df_master[var])
 
         # # scatter
@@ -226,7 +234,6 @@ if MICAF == 'mica_vs_master':
         # plt.tight_layout()
         # plt.show()
 
-    
         # # 2d histogram with fit
         if var in ['water_vapor']:
             # vs Date
@@ -244,7 +251,7 @@ if MICAF == 'mica_vs_master':
             plt.figure(figsize=[8, 9])
             x = interp_cloudt
             y = interp_skyt
-            plt.hist2d(x, y, bins=NBINS, cmap='Greys')#, norm=matplotlib.colors.LogNorm())
+            plt.hist2d(x, y, bins=NBINS, cmap='Greys')  # , norm=matplotlib.colors.LogNorm())
             # # fit
             # if var in ['Cloud_T']:
             #     optp, _ = curve_fit(fit_func, x, y, p0=[-1,60,1])
@@ -272,6 +279,10 @@ else:
         plt.scatter(x, y, c='r', marker='.', s=2)
         # if var == 'date_diff':
         #    plt.ylim(DATE_DIFF_LIM)
+        if var == 'Sky_T_over_Sun_T':
+            ax = plt.gca()
+            ax.set_yscale('log')
+
         plt.xlabel(df_all["Date"].name)
         plt.ylabel(df_all[var].name + COL_UNITS[var])
         plt.tight_layout()
@@ -306,12 +317,12 @@ else:
             plt.savefig(OPATH+'/'+var+'_hour', dpi=DPI)
             plt.close()
 
-            # vs air mass
-            print(OAFA_LOC)
-            date = datetime(2007, 2, 18, 15, 13, 1, 130320, tzinfo=timezone.utc)
-            altitude_deg = solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1], date)
-            solar.radiation.get_radiation_direct(date, altitude_deg)
-            breakpoint()
+            # # vs air mass
+            # print(OAFA_LOC)
+            # date = datetime(2007, 2, 18, 15, 13, 1, 130320, tzinfo=timezone.utc)
+            # altitude_deg = solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1], date)
+            # solar.radiation.get_radiation_direct(date, altitude_deg)
+            # breakpoint()
 
         # histograms
         plt.figure(figsize=[10, 6])
