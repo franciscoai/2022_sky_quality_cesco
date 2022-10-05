@@ -7,6 +7,7 @@ import datetime
 import os
 from water_vapor import water_vapor
 import matplotlib.dates as mdates
+import seaborn as sns
 
 REPO_PATH = os.getcwd()
 path = REPO_PATH + '/data/master'
@@ -19,7 +20,10 @@ COL_NAMES_WEA = ["DATE", "HOUR(UT)", "TEMP", "PRESS", "HUM", "WSP", "WDIR"]
 NBINS = 20
 REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
           "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
-variables = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", 'date_diff']  # variables to plot
+variables = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "date_diff"]  # variables to plot
+units = ["  [$^\circ C$]", "  [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]",""]
+remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "date_diff": [0]}
+remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "date_diff": [3600]}
 
 # create opath
 os.makedirs(OPATH, exist_ok=True)
@@ -43,6 +47,8 @@ for var in COL_NAMES[2:]:
     for i in REMOVE[var]:
         df_1 = df_all[df_all[var] <= i].index
         df_final = df_all.drop(df_1)
+
+
 
 # print("Creating Images...")
 
@@ -92,27 +98,41 @@ df_all_wea["WV"] = water_vapor(df_all["Amb_T"], df_all["Hum%"])
 df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
 
 # remove values
-df_weather.drop(df_weather[df_weather['TEMP'] <= -50].index, inplace=True)
-df_weather.drop(df_weather[df_weather['TEMP'] >= 50].index, inplace=True)
+for var in variables:
+    for i in remove_weather_min[var]:
+        df_2 = df_weather[df_weather[var] <= i].index
+        df_weather = df_weather.drop(df_2)
+
+for var in variables:
+    for i in remove_weather_max[var]:
+        df_3 = df_weather[df_weather[var] >= i].index
+        df_weather= df_weather.drop(df_3)
 
 months = df_weather['DATE_TIME'].dt.month.unique()
 years = np.sort(df_weather['DATE_TIME'].dt.year.unique())
 
+j = 0
 # Ploting graphics
 for i in variables:
     fig1, (ax1, ax2, ax3) = plt.subplots(3)
     fig1.set_size_inches(13, 4)
-    # ploting seasonal median and standar deviation
     median = []
-    std = []
+    colors = '#e4e8f0'
     for m in months:
         tot = df_weather.loc[df_weather['DATE_TIME'].dt.month == m, i]
-        median.append(tot.mean())
-        std.append(tot.std())
+        median.append(tot)
+        
+
     ax1 = plt.subplot(1, 3, 1)
-    ax1.bar(months, median, yerr=std, align='center', alpha=0.5, color="grey", ecolor='black', capsize=5)
-    ax1.plot(months, median, "ko")
-    ax1.set_ylabel(i)
+    
+    bp = ax1.boxplot(median, showfliers=False, patch_artist = True)
+    for median in bp['medians']:
+        median.set(color ='black',linewidth = 3)
+    for patch in bp['boxes']:
+        patch.set_facecolor(color = 'white')
+    
+
+    ax1.set_ylabel(i+units[j])
     ax1.set_xticks(months)
     ax1.set_xticklabels(months)
     #ax1.set_title('Seasonal median and standar deviation')
@@ -124,16 +144,22 @@ for i in variables:
 
     # Ploting Year median and standar deviation
     median_y = []
-    std_y = []
+    # std_y = []
     for y in years:
         total = df_weather.loc[df_weather['DATE_TIME'].dt.year == y, i]
-        median_y.append(total.mean())
-        std_y.append(total.std())
+        median_y.append(total)
+        # std_y.append(total.std())
     ax2 = plt.subplot(1, 3, 2)
     nyear = np.arange(len(years))
-    ax2.bar(nyear, median_y, yerr=std_y, align='center', alpha=0.5, color="grey", ecolor='black', capsize=5)
-    ax2.plot(nyear, median_y, "ko")
-    ax2.set_ylabel(i)
+
+    bp2 = ax2.boxplot(median_y, showfliers=False)
+    for median in bp2['medians']:
+        median.set(color ='black',linewidth = 3)
+    for patch in bp2['boxes']:
+        patch.set_color(color = 'white')    
+    # ax2.bar(nyear, median_y, yerr=std_y, align='center', alpha=0.5, color="grey", ecolor='black', capsize=5)
+    # ax2.plot(nyear, median_y, "ko")
+    ax2.set_ylabel(i+units[j])
     ax2.set_xlabel('Year from 2000')
     ax2.set_xticks(nyear[::2])
     #ax2.set_xticklabels(nyear, rotation=10)
@@ -147,7 +173,7 @@ for i in variables:
     ax3 = plt.subplot(1, 3, 3)
     ax3.hist(df_weather[i], weights=df_weather["date_diff"], density=True,
              cumulative=True, color="grey", bins=NBINS, log=True)
-    ax3.set_xlabel(i)
+    ax3.set_xlabel(i+units[j])
     # ax3.set_ylabel("%")
     #ax3.set_title('Cumulative Distribution')
     ax3.minorticks_on()
@@ -159,3 +185,4 @@ for i in variables:
     plt.tight_layout()
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
+    j=j+1
