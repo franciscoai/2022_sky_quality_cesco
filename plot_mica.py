@@ -317,12 +317,6 @@ else:
             plt.savefig(OPATH+'/'+var+'_hour', dpi=DPI)
             plt.close()
 
-            # # vs air mass
-            # print(OAFA_LOC)
-            # date = datetime(2007, 2, 18, 15, 13, 1, 130320, tzinfo=timezone.utc)
-            # altitude_deg = solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1], date)
-            # solar.radiation.get_radiation_direct(date, altitude_deg)
-            # breakpoint()
 
         # histograms
         plt.figure(figsize=[10, 6])
