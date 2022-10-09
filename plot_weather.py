@@ -7,7 +7,7 @@ import datetime
 import os
 from water_vapor import water_vapor
 import matplotlib.dates as mdates
-import seaborn as sns
+
 
 REPO_PATH = os.getcwd()
 path = REPO_PATH + '/data/master'
@@ -121,21 +121,15 @@ for i in variables:
     for m in months:
         tot = df_weather.loc[df_weather['DATE_TIME'].dt.month == m, i]
         median.append(tot)
-        
-
     ax1 = plt.subplot(1, 3, 1)
-    
     bp = ax1.boxplot(median, showfliers=False, patch_artist = True)
     for median in bp['medians']:
         median.set(color ='black',linewidth = 3)
     for patch in bp['boxes']:
         patch.set_facecolor(color = 'white')
-    
-
     ax1.set_ylabel(i+units[j])
     ax1.set_xticks(months)
     ax1.set_xticklabels(months)
-    #ax1.set_title('Seasonal median and standar deviation')
     ax1.minorticks_on()
     ax1.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax1.yaxis.grid(True, which='major')
@@ -144,44 +138,43 @@ for i in variables:
 
     # Ploting Year median and standar deviation
     median_y = []
-    # std_y = []
     for y in years:
         total = df_weather.loc[df_weather['DATE_TIME'].dt.year == y, i]
         median_y.append(total)
-        # std_y.append(total.std())
     ax2 = plt.subplot(1, 3, 2)
     nyear = np.arange(len(years))
-
-    bp2 = ax2.boxplot(median_y, showfliers=False)
+    bp2 = ax2.boxplot(median_y, showfliers=False, patch_artist = True)
     for median in bp2['medians']:
         median.set(color ='black',linewidth = 3)
     for patch in bp2['boxes']:
-        patch.set_color(color = 'white')    
-    # ax2.bar(nyear, median_y, yerr=std_y, align='center', alpha=0.5, color="grey", ecolor='black', capsize=5)
-    # ax2.plot(nyear, median_y, "ko")
+        patch.set_facecolor(color = 'white')  
     ax2.set_ylabel(i+units[j])
     ax2.set_xlabel('Year from 2000')
     ax2.set_xticks(nyear[::2])
-    #ax2.set_xticklabels(nyear, rotation=10)
-    #ax2.set_title('Yearly median and standar deviation')]
     ax2.minorticks_on()
     ax2.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax2.yaxis.grid(True, which='Major')
     ax2.xaxis.set_tick_params(which='minor', bottom=False)
 
     # Ploting cumulative histogram
+
+    val_medio=round(df_weather[i].mean(),3)
+    mediana=df_weather[i].median()
+    max= df_weather[i].max()
+    min=df_weather[i].min()
     ax3 = plt.subplot(1, 3, 3)
     ax3.hist(df_weather[i], weights=df_weather["date_diff"], density=True,
              cumulative=True, color="grey", bins=NBINS, log=True)
     ax3.set_xlabel(i+units[j])
-    # ax3.set_ylabel("%")
-    #ax3.set_title('Cumulative Distribution')
     ax3.minorticks_on()
     ax3.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.yaxis.grid(True, which='Major')
     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.xaxis.grid(True, which='Major')
-    #ax3.xaxis.set_tick_params(which='minor', bottom=False)
+    ax3.text(5,0.01,"min: "+str(min))
+    ax3.text(5,0.006,"max: "+str(max))
+    ax3.text(5,0.004,"medium value:  "+str(val_medio))
+    ax3.text(5,0.0025,"median: "+str(mediana))
     plt.tight_layout()
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
