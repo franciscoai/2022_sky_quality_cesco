@@ -159,19 +159,29 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     # vs date
     y = df_all[i]
     x = df_all["Date"]
-    plt.figure(figsize=[10, 6])
-    plt.scatter(x, y, c='k', marker='.', s=2)
-    median = []
-    mdate = []
-    tdf=df_all.resample('M', on='Date').median()
+    plt.figure(figsize=[10, 6]) 
+    # tdf = df_all.resample('M', on='Date').quantile(0.7)
+    # plt.plot(tdf["Date"], tdf[i], '--', color='grey', label='Monthly p70 ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')    
+    tdf = df_all.resample('M', on='Date').median()
     tdf.reset_index(inplace=True)
-    plt.plot(tdf["Date"], tdf[i], color='grey', label='Monthly median')
-    ax = plt.gca()
-    ax.set_yscale('log')
+    plt.plot(tdf["Date"], tdf[i], color='black', label='Monthly median ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
+    tdf = df_all.resample('M', on='Date').quantile(0.1)
+    plt.plot(tdf["Date"], tdf[i], color='grey', label='Monthly p10 ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
+
+    # if SUNSPOT_FILE is not None:
+    #     with open(SUNSPOT_FILE, 'rb') as handle:
+    #         sunspot = pickle.load(handle)
+    #     sunspot = sunspot.resample('M', on='date').median()
+    #     sunspot.reset_index(inplace=True)
+    #     plt.plot(sunspot["date"], 40*sunspot['num']/sunspot['num'].max(),'--k', label='Norm sunspot monthly median')
+
     plt.xlabel(df_all["Date"].name)
     plt.ylabel(df_all[i].name + COL_UNITS[i])
     plt.tight_layout()
-    plt.grid('both')
+    plt.ylim([0, 50])
+    plt.minorticks_on()
+    plt.grid(visible=True, which='both')
+    plt.legend()
     plt.savefig(OPATH+'/'+i+'_vs_date', dpi=DPI)
     plt.close()
 
