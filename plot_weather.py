@@ -201,11 +201,6 @@ for i in variables:
     ax3.yaxis.grid(True, which='Major')
     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.xaxis.grid(True, which='Major')
-    x = 0.4*(ax3.get_xlim()[0]-ax3.get_xlim()[1])
-    y1 = 0.55*ax3.get_ylim()[1]
-    y2 = 0.5*ax3.get_ylim()[1]
-    y3 = 0.45*ax3.get_ylim()[1]
-    y4 = 0.40*ax3.get_ylim()[1]
     ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
     ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
     ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
