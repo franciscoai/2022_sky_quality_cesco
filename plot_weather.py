@@ -18,11 +18,11 @@ OPATH_WEA = REPO_PATH + '/output/wea'
 DAY_TIME = [datetime.time(hour=10, minute=0), datetime.time(hour=22, minute=0)]  # daytime interval
 COL_NAMES = ["DAY", "HOUR(UT)", "Sky_T", "Amb_T", "WindS", "Hum%", "DewP", "C", "W", "R", "Cloud_T", "DATE_DIF", "WV"]
 COL_NAMES_WEA = ["DATE", "HOUR(UT)", "TEMP", "PRESS", "HUM", "WSP", "WDIR"]
-NBINS = 20
+NBINS = 50
 REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
           "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
 variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
-units = ["  [$^\circ C$]", "  [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]",""]
+units = ["  [$^\circ C$]", "  [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]",""," ","seg"]
 remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
 remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
 variables=['HUM', 'TEMP','Sky_T', 'WSP', 'Cloud_T', 'WV', 'PRESS', 'WDIR']
@@ -128,12 +128,15 @@ df_combined.drop(['C'], axis=1, inplace = True)
 df_combined.drop(['W'], axis=1, inplace = True)
 df_combined.drop(['R'], axis=1, inplace = True)
 df_combined.drop(['DewP'], axis=1, inplace = True)
-
+df_combined=df_combined.resample('300S', on='DATE_TIME').mean()
+df_combined.reset_index(inplace=True)
 
 months = df_combined['DATE_TIME'].dt.month.unique()
 years = np.sort(df_combined['DATE_TIME'].dt.year.unique())
-
 j = 0
+
+
+
 # Ploting graphics
 for i in variables:
     print(i)
@@ -142,8 +145,9 @@ for i in variables:
     median = []
     colors = '#e4e8f0'
     for m in months:
-        tot = df_combined.loc[(df_combined['DATE_TIME'].dt.month == m) &(df_combined[i]!= np.nan), i]
+        tot = df_combined.loc[(df_combined['DATE_TIME'].dt.month == m) & (pd.notna(df_combined[i])), i]
         median.append(tot)
+    
     ax1 = plt.subplot(1, 3, 1)
     bp = ax1.boxplot(median, showfliers=False, patch_artist = True)
     for median in bp['medians']:
@@ -162,7 +166,7 @@ for i in variables:
     # Ploting Year median and standar deviation
     median_y = []
     for y in years:
-        total = df_combined.loc[(df_combined['DATE_TIME'].dt.year == y) &(df_combined[i]!= np.NAN), i]
+        total = df_combined.loc[(df_combined['DATE_TIME'].dt.year == y) & (pd.notna(df_combined[i])), i]
         median_y.append(total)
     ax2 = plt.subplot(1, 3, 2)
     nyear = np.arange(len(years))
@@ -182,23 +186,30 @@ for i in variables:
     # Ploting cumulative histogram
 
     val_medio=round(df_combined[i].mean(),1)
-    mediana=df_combined[i].median()
-    max= df_combined[i].max()
-    min=df_combined[i].min()
+    mediana=round(df_combined[i].median(),1)
+    max= round(df_combined[i].max(),1)
+    min=round(df_combined[i].min(),1)
+    
+    c = df_combined.loc[(pd.notna(df_combined[i])), i]
+    w= df_combined.loc[(pd.notna(df_combined[i])), "DATE_DIF"]
+   
     ax3 = plt.subplot(1, 3, 3)
-
-    ax3.hist(df_combined[i], weights=df_combined["DATE_DIF"], density=True,
-             cumulative=True, color="grey", bins=NBINS, log=True)
+    ax3.hist(c, density=True,cumulative =True, color="grey", bins=NBINS, log=False)
     ax3.set_xlabel(i+units[j])
     ax3.minorticks_on()
     ax3.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.yaxis.grid(True, which='Major')
     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.xaxis.grid(True, which='Major')
-    ax3.text(0.5,0.5, "Min: "+str(min),horizontalalignment = 'center',verticalalignment='bottom',fontsize = 11)
-    # ax3.text("Max: "+str(max),fontsize = 11)
-    # ax3.text("Mean value:  "+str(val_medio),fontsize = 11)
-    # ax3.text("Median: "+str(mediana),fontsize = 11)
+    x = 0.4*(ax3.get_xlim()[0]-ax3.get_xlim()[1])
+    y1 = 0.55*ax3.get_ylim()[1]
+    y2 = 0.5*ax3.get_ylim()[1]
+    y3 = 0.45*ax3.get_ylim()[1]
+    y4 = 0.40*ax3.get_ylim()[1]
+    ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
+    ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
+    ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
+    ax3.text(0.4,0.4,"Median: "+str(mediana), transform=ax3.transAxes,fontsize = 12)
     plt.tight_layout()
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
