@@ -187,7 +187,7 @@ for i in variables:
     min=df_combined[i].min()
     ax3 = plt.subplot(1, 3, 3)
 
-    ax3.hist(np.isnan(df_combined[i]), weights=df_combined["DATE_DIF"], density=True,
+    ax3.hist(df_combined[i], weights=df_combined["DATE_DIF"], density=True,
              cumulative=True, color="grey", bins=NBINS, log=True)
     ax3.set_xlabel(i+units[j])
     ax3.minorticks_on()
@@ -195,7 +195,7 @@ for i in variables:
     ax3.yaxis.grid(True, which='Major')
     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.xaxis.grid(True, which='Major')
-    ax3.text("Min: "+str(min),horizontalalignment = 'center',verticalalignment='bottom',fontsize = 11)
+    ax3.text(0.5,0.5, "Min: "+str(min),horizontalalignment = 'center',verticalalignment='bottom',fontsize = 11)
     # ax3.text("Max: "+str(max),fontsize = 11)
     # ax3.text("Mean value:  "+str(val_medio),fontsize = 11)
     # ax3.text("Median: "+str(mediana),fontsize = 11)
