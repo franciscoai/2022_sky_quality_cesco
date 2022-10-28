@@ -14,7 +14,7 @@ def water_vapor(T, RH):
 
     # Constants:
     H = 1.5					# the PWV Height scale in km
-    z0 = 2.5				# surface altitude in km
+    z0 = 2.370				# surface altitude in km
     zmax = 12  				# maximum altitude for PWV contribution in km (zmax = 12 km from Otarola et al. (2010))
     Rv = 461.9 				# The water vapor gas constant (J Kg^-1 K^-1)
 
