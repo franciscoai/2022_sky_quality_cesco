@@ -63,7 +63,7 @@ matplotlib.rc('font', size=12)  # font size
 DPI = 300.  # image dpi
 OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
-CAL_EQ = [2.83, 47.55]  # for Fe XIV at 6 Sr
+CAL_EQ = [1.63, 49.01]  # for Fe XIV at 6 Sr
 B_LIM = 50  # Limit of B [ppm] term when fitting the Int vs Zenith Angle function
 RES_LIM = 50  # Limit of the fit rms residual [ppm]
 
@@ -147,7 +147,7 @@ if os.path.isfile(pfile):
     with open(pfile, "rb") as input_file:
         fit_res = pickle.load(input_file)
 else:
-    lim = 40  # np.percentile(df_all['Sky_B2'], 0.01)
+    lim = 20  # np.percentile(df_all['Sky_B2'], 0.01)
     print('Will fit only days with median Sky_B2<'+str(lim))
     i = 0
     fit_res = []
@@ -200,7 +200,7 @@ plt.close()
 # B vs date
 plt.figure(figsize=[10, 6])
 plt.plot(medfilt(fit_res[ok_ind, 2].flatten(), 7))
-plt.title('Median/Mean:'+str(np.median(fit_res[ok_ind, 2])) + '/'+str(np.mean(fit_res[ok_ind, 2])))
+plt.title('Median/Mean:'+'{:4}'.format(np.median(fit_res[ok_ind, 2])) + '/'+'{:4}'.format(np.mean(fit_res[ok_ind, 2])))
 plt.grid()
 plt.yscale('log')
 plt.xlabel('Date')
@@ -212,7 +212,7 @@ plt.close()
 # B hist
 plt.figure(figsize=[10, 6])
 plt.hist(fit_res[ok_ind, 2], log=False, bins=NBINS, cumulative=True, color='k', histtype='step', density=True)
-plt.title('Median/p90:'+str(np.median(fit_res[ok_ind, 2])) + '/'+str(np.quantile(fit_res[ok_ind, 2], 0.9)))
+plt.title('Median/p10:'+'{:4}'.format(np.median(fit_res[ok_ind, 2])) + '/'+'{:4}'.format(np.quantile(fit_res[ok_ind, 2], 0.1)))
 plt.grid()
 plt.ylabel('number of days / '+'{:4}'.format(len(ok_ind)))
 plt.xlabel('$B$ [ppm]')
@@ -221,7 +221,7 @@ plt.savefig(OPATH+'/'+var+'_inst_scatter_all_hist', dpi=DPI)
 plt.close()
 
 # keeps only the best 1% fits
-lim = 1 # np.percentile(fit_res[:, 4], 2)
+lim = 2 # np.percentile(fit_res[:, 4], 2)
 print('Will plot only days with residual <'+str(lim))
 fit_res = fit_res[ok_ind, :]
 fit_res = fit_res[np.argwhere(fit_res[:, 4] < lim)[:, 0], :]
@@ -232,42 +232,42 @@ all_b = []
 for f in fit_res[:, 0]:
     strf = str(np.int32(f))
     print(str(i)+' of '+str(np.size(fit_res[:, 0])))
-    df = df_all[date_str == strf]
-    minang = 90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  df['Date'].min().to_pydatetime())
-    if len(df) > 7000:  # plot only those with at leat XXh of data
-        a, b, t, chi2 = fit_res[i, 1:5]
-        all_b.append(b)
-        if True:
-            fig = plt.figure(figsize=[10, 6])
+    if strf in ['20120624','20120415','20110912','20110813','20090601','20081026','20070815','20070617','20070402','20070123','20060303','19971222','19980624','19990314','19990530']:
+        df = df_all[date_str == strf]
+        if np.sum(df['date_diff']) > 6*3600.:  # plot only those with at leat XXh of data
             x = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
-            y = df[var]  # signal.medfilt(df[var], kernel_size=9)  # FILTRO
-            x_line = np.arange(min(x), max(x), 1)
-            y_line = sky_b_func(x_line, a, b, t)
-            plt.scatter(x, y, marker='.', s=1, label=strf)
-            plt.plot(x_line, y_line, '-k')
-            print(strf, a, b, t, chi2)
-            plt.xlabel('zenith_ang [Deg]')
-            plt.ylabel(df_all[var].name + '[ppm]')
-            plt.ylim([0, 100])
-            plt.title('B = '+str(b)+'[ppm]')
-            # plt.xlim([20,22])
-            # lgnd = plt.legend(loc='lower right')
-            # for handle in lgnd.legendHandles:
-            #     handle.set_sizes([40.0])
-            plt.tight_layout()
-            plt.grid(True, which='both')
-            ax = plt.gca()
-            plt.savefig(OPATH+'/'+var+'_zenith_'+strf, dpi=DPI)
-            plt.close()
+            a, b, t, chi2 = fit_res[i, 1:5]
+            if b < 4: #np.abs(np.mean(x[np.argmin(x):])-np.mean(x[0:np.argmin(x)])) < 5: 
+                all_b.append(b)
+                fig = plt.figure(figsize=[10, 6])
+                y = df[var]  # signal.medfilt(df[var], kernel_size=9)  # FILTRO
+                x_line = np.arange(min(x), max(x), 1)
+                y_line = sky_b_func(x_line, a, b, t)
+                plt.scatter(x, y, marker='.', s=1, label=strf)
+                plt.plot(x_line, y_line, '-k')
+                print(strf, a, b, t, chi2)
+                plt.xlabel('zenith_ang [Deg]')
+                plt.ylabel(df_all[var].name + '[ppm]')
+                plt.ylim([0, 100])
+                plt.title('B = '+'{:4}'.format(b)+'[ppm]')
+                # plt.xlim([20,22])
+                # lgnd = plt.legend(loc='lower right')
+                # for handle in lgnd.legendHandles:
+                #     handle.set_sizes([40.0])
+                plt.tight_layout()
+                plt.grid(True, which='both')
+                ax = plt.gca()
+                plt.savefig(OPATH+'/'+var+'_zenith_'+strf, dpi=DPI)
+                plt.close()
     i += 1
 
 
 # B residual hist
 print('Number of used days '+str(len(all_b)))
-print('Wich is the best '+str(len(all_b)/sz_all))
+print('Wich is the best '+'{:4}'.format(len(all_b)/sz_all))
 plt.figure(figsize=[10, 6])
 plt.hist(all_b, log=True, bins=20, cumulative=False, color='k', histtype='step')
-plt.title('Median/Std dev.:'+str(np.median(all_b))+'/'+str(np.std(all_b)))
+plt.title('Median/Std dev./p10:'+'{:4}'.format(np.median(all_b))+'/'+'{:4}'.format(np.std(all_b))+'/'+'{:4}'.format(np.quantile(all_b,0.1)))
 plt.grid()
 plt.ylabel('number of days')
 plt.xlabel('$B$ [ppm]')

@@ -18,7 +18,7 @@ from water_vapor import water_vapor
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = None  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
+MICAF = 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']
 # ,'201201', '201202', '201204', '201205', '201206']  # months to delete
@@ -35,8 +35,8 @@ matplotlib.rc('font', size=12)  # font size
 BWIDTH = 0.45
 DPI = 300.  # image dpi
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
-CAL_EQ = [2.83, 47.55]  # for Fe XIV at 6 Sr
-SCATTER_LIGHT = 3.  # in ppm
+CAL_EQ = [1.63, 49.01]  # for Fe XIV C at 6 Sr # [2.83, 47.55]  # for Fe XIV L at 6 Sr
+SCATTER_LIGHT = 1.0  # in ppm
 SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
 SCIFMT = '{:4.2f}'
 
@@ -263,10 +263,9 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     #ax3.set_ylim([0, 1200])
     if i == 'Imica':
         ax3.set_xlim([0, 100])
-    ax3.text(40, 800, "Median: " + SCIFMT.format(df_all[i].median()), fontsize=11)
-    ax3.text(40, 700, "Min: "+SCIFMT.format(min), fontsize=11)
-    ax3.text(40, 600, "p95 ; p5: "+SCIFMT.format(df_all[i].quantile(0.95)
-                                                 )+' ; '+SCIFMT.format(df_all[i].quantile(0.05)), fontsize=11)
+    print("Median: " + SCIFMT.format(df_all[i].median()))
+    print("Min: "+SCIFMT.format(min))
+    print("p95 ; p5: "+SCIFMT.format(df_all[i].quantile(0.95))+' ; '+SCIFMT.format(df_all[i].quantile(0.05)))
 
     # Ploting cumulative histogram
     val_medio = round(df_all[i].mean(), 1)
