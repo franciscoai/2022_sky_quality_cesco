@@ -22,10 +22,10 @@ NBINS = 50
 REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
           "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
 variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
-units = ["  [$^\circ C$]", "  [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]",""," ","seg"]
+variables=['TEMP', 'PRESS','HUM','WSP','WDIR', 'WV', 'Cloud_T', 'Sky_T',  "DATE_DIF"]
+units = ["  [$^\circ C$]", "  [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]"," "," ","seg"]
 remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
 remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
-variables=['HUM', 'TEMP','Sky_T', 'WSP', 'Cloud_T', 'WV', 'PRESS', 'WDIR']
 
 
 # create opath
@@ -201,11 +201,16 @@ for i in variables:
     ax3.yaxis.grid(True, which='Major')
     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.xaxis.grid(True, which='Major')
-    ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
-    ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
-    ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
-    ax3.text(0.4,0.4,"Median: "+str(mediana), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.4,"Median: "+str(mediana), transform=ax3.transAxes,fontsize = 12)
     plt.tight_layout()
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
     j=j+1
+    print("Mean: ",val_medio)
+    print("Median: ",mediana)
+    print("Max: ",max)
+    print("Min: ",min)
+
