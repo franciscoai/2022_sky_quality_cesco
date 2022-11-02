@@ -95,7 +95,7 @@ for g in mf_wea:
     df_wea['DATE_DIF'] = df_wea['DATE_TIME'].diff().dt.total_seconds()
     df_all_wea.append(df_wea)
 df_all_wea = pd.concat(df_all_wea, ignore_index=True)
-df_all_wea["WV"] = water_vapor(df_all["Amb_T"], df_all["Hum%"])
+df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 
 # creating df with day hours

@@ -1,5 +1,5 @@
   DATE    HOUR(UT)    TEMP   PRESS    HUM      WSP   WDIR
-AAAAMMDD  HH:MM:SS     °C    mm Hg     %       m/s   0N90E
+AAAAMMDD  HH:MM:SS     ï¿½C    mm Hg     %       m/s   0N90E
 20180101  00:00:00   -65.5   686.4    41.0     3.9   294.0
 20180101  00:05:00   -65.5   686.4    40.0     4.2   294.0
 20180101  00:10:00   -65.5   686.4    40.0     3.2   294.0

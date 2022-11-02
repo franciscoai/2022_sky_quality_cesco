@@ -1,21 +1,21 @@
-# -*- coding: utf-8 -*-
-import pickle
-from lib2to3.pgen2.token import OP
-import os
-from textwrap import shorten
-from tkinter.messagebox import NO
-import numpy as np
+
 import matplotlib
 from matplotlib import pyplot as plt
 import pandas as pd
 from datetime import datetime
 from datetime import timedelta
-import copy
 from pyparsing import col
-import matplotlib.dates as mdates
-from scipy.optimize import curve_fit
+from calendar import month
+from pickle import TRUE
+from re import M
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import datetime
+import os
 from water_vapor import water_vapor
-import pysolar.solar as solar
+import matplotlib.dates as mdates
+
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
@@ -41,7 +41,24 @@ SCATTER_LIGHT = 1.0  # in ppm
 SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
 SCIFMT = '{:4.2f}'
 OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
+REPO_PATH_MW = os.getcwd()
+path = REPO_PATH_MW + '/data/master'
+OPATH_W = REPO_PATH_MW + '/output/weather'
+path_wea = REPO_PATH_MW + '/data/wea'
+OPATH_WEA = REPO_PATH_MW + '/output/wea'
+DAY_TIME = [datetime.time(hour=10, minute=0), datetime.time(hour=22, minute=0)]  # daytime interval
+COL_NAMES_M= ["DAY", "HOUR(UT)", "Sky_T", "Amb_T", "WindS", "Hum%", "DewP", "C", "W", "R", "Cloud_T", "DATE_DIF", "WV"]
+COL_NAMES_WEA = ["DATE", "HOUR(UT)", "TEMP", "PRESS", "HUM", "WSP", "WDIR"]
+NBINS = 50
+REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
+          "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
+variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
+variables=['TEMP', 'PRESS','HUM','WSP','WDIR', 'WV', 'Cloud_T', 'Sky_T',  "DATE_DIF"]
+units = ["  [$^\circ C$]", "[mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]"," "," ","seg"]
+remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
+remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
 
+#---------------------------------------------------------Mica--------------------------------------------
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
 if MICAF is not None:
@@ -117,9 +134,83 @@ for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     print('p99: %s' % np.nanpercentile(df_all[var], 99))
     print('p10: %s' % np.nanpercentile(df_all[var], 10))
     print('----------------------------------------------------')
+#---------------------------------------------Master and Weather----------------------------------------------
+# create OPATH_W
+os.makedirs(OPATH, exist_ok=True)
+mf = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
+
+# reading all files and converting to datetime
+df_all_master = []
+for f in mf:
+    df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
+    df["DAY"] = pd.to_datetime(df["DAY"], format="%Y%m%d")
+    df["HOUR(UT)"] = [datetime.timedelta(hours=h) for h in df['HOUR(UT)']]
+    df["DATE"] = df["DAY"]+df["HOUR(UT)"]
+    df_all_master.append(df)
+df_all_master = pd.concat(df_all_master, ignore_index=True)
+
+df_all_master["Cloud_T"] = df_all_master["Sky_T"] - df_all_master["Amb_T"]
+df_all_master["DATE_DIF"] = df_all_master["DATE"].diff().dt.total_seconds()
+
+# remove values
+for var in COL_NAMES[2:]:
+    for i in REMOVE[var]:
+        df_1 = df_all_master[df_all_master[var] <= i].index
+        df_final = df_all_master.drop(df_1)
+
+
+mf_wea = [os.path.join(path_wea, f) for f in os.listdir(path_wea) if f.endswith('.txt')]
+# reading all files and converting to datetime
+df_all_wea = []
+for g in mf_wea:
+    df_wea = pd.read_csv(g, delim_whitespace=True, skiprows=2, names=COL_NAMES_WEA, encoding='latin1')
+    df_wea["DATE"] = pd.to_datetime(df_wea["DATE"], format="%Y%m%d")
+    df_wea["HOUR(UT)"] = pd.to_timedelta(df_wea["HOUR(UT)"])
+    df_wea["DATE_TIME"] = df_wea["DATE"]+df_wea["HOUR(UT)"]
+    df_wea['DATE_DIF'] = df_wea['DATE_TIME'].diff().dt.total_seconds()
+    df_all_wea.append(df_wea)
+df_all_wea = pd.concat(df_all_wea, ignore_index=True)
+df_all_wea["WV"] = water_vapor(df_all_wea["Amb_T"], df_all_wea["Hum%"])
+
+# creating df with day hours
+df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
+
+# remove values
+for var in variables_w:
+    for i in remove_weather_min[var]:
+        df_2 = df_weather[df_weather[var] <= i].index
+        df_weather = df_weather.drop(df_2)
+
+for var in variables_w:
+    for i in remove_weather_max[var]:
+        df_3 = df_weather[df_weather[var] >= i].index
+        df_weather= df_weather.drop(df_3)
+
+#Renaming and creating columns
+#df_final["ORIGIN"] = 'M'
+#df_weather["ORIGIN"] = "W"
+df_final.rename(columns = {'DATE':'DATE_TIME'}, inplace = True)
+df_final.rename(columns = {'DAY':'DATE'}, inplace = True)
+df_final.rename(columns = {'Amb_T':'TEMP'}, inplace = True)
+df_final.rename(columns = {'Hum%':'HUM'}, inplace = True)
+df_final.rename(columns = {'WindS':'WSP'}, inplace = True)
+df_final["WV"] = water_vapor(df_final["TEMP"], df_final["HUM"])
+
+#Creating combined dataframe
+df_combined = pd.DataFrame
+df_combined = pd.concat([df_final,df_weather],ignore_index = True,sort = False)
+df_combined.drop(['C'], axis=1, inplace = True)
+df_combined.drop(['W'], axis=1, inplace = True)
+df_combined.drop(['R'], axis=1, inplace = True)
+df_combined.drop(['DewP'], axis=1, inplace = True)
+df_combined=df_combined.resample('300S', on='DATE_TIME').mean()
+df_combined.reset_index(inplace=True)
+
+
 
 
 ############################
-CALCULAR Z:
+#CALCULAR Z:
 
 z = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
+
