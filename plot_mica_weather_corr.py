@@ -137,11 +137,11 @@ for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
 #---------------------------------------------Master and Weather----------------------------------------------
 # create OPATH_W
 os.makedirs(OPATH, exist_ok=True)
-mf = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
+mf_master = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
 
 # reading all files and converting to datetime
 df_all_master = []
-for f in mf:
+for f in mf_master:
     df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
     df["DAY"] = pd.to_datetime(df["DAY"], format="%Y%m%d")
     df["HOUR(UT)"] = [datetime.timedelta(hours=h) for h in df['HOUR(UT)']]
