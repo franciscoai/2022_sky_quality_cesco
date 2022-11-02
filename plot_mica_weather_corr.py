@@ -144,6 +144,18 @@ remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR
 
 # create OPATH_W
 os.makedirs(OPATH, exist_ok=True)
+<<<<<<< HEAD
+mfm = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
+
+# reading all files and converting to datetime
+df_all_master = []
+for f in mfm:
+    dfm = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES_M)
+    dfm["DAY"] = pd.to_datetime(dfm["DAY"], format="%Y%m%d")
+    dfm["HOUR(UT)"] = [timedelta(hours=h) for h in dfm['HOUR(UT)']]
+    dfm["DATE"] = dfm["DAY"]+dfm["HOUR(UT)"]
+    df_all_master.append(dfm)
+=======
 mf_master = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
 
 # reading all files and converting to datetime
@@ -154,6 +166,7 @@ for f in mf_master:
     df["HOUR(UT)"] = [datetime.timedelta(hours=h) for h in df['HOUR(UT)']]
     df["DATE"] = df["DAY"]+df["HOUR(UT)"]
     df_all_master.append(df)
+>>>>>>> 070c853719c1a3401f63f1c7433f47cf492a8797
 df_all_master = pd.concat(df_all_master, ignore_index=True)
 
 df_all_master["Cloud_T"] = df_all_master["Sky_T"] - df_all_master["Amb_T"]
