@@ -1,25 +1,27 @@
 
+import pickle
+from lib2to3.pgen2.token import OP
+import os
+from textwrap import shorten
+from tkinter.messagebox import NO
+import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
 import pandas as pd
 from datetime import datetime
 from datetime import timedelta
+import copy
 from pyparsing import col
-from calendar import month
-from pickle import TRUE
-from re import M
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import datetime
-import os
-from water_vapor import water_vapor
 import matplotlib.dates as mdates
-
+from scipy.optimize import curve_fit
+from water_vapor import water_vapor
+from calendar import month
+import matplotlib.dates as mdates
+import pysolar.solar as solar
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = None #'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
+MICAF = 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']
 # ,'201201', '201202', '201204', '201205', '201206']  # months to delete
@@ -41,24 +43,9 @@ SCATTER_LIGHT = 1.0  # in ppm
 SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
 SCIFMT = '{:4.2f}'
 OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
-REPO_PATH_MW = os.getcwd()
-path = REPO_PATH_MW + '/data/master'
-OPATH_W = REPO_PATH_MW + '/output/weather'
-path_wea = REPO_PATH_MW + '/data/wea'
-OPATH_WEA = REPO_PATH_MW + '/output/wea'
-DAY_TIME = [datetime.time(hour=10, minute=0), datetime.time(hour=22, minute=0)]  # daytime interval
-COL_NAMES_M= ["DAY", "HOUR(UT)", "Sky_T", "Amb_T", "WindS", "Hum%", "DewP", "C", "W", "R", "Cloud_T", "DATE_DIF", "WV"]
-COL_NAMES_WEA = ["DATE", "HOUR(UT)", "TEMP", "PRESS", "HUM", "WSP", "WDIR"]
-NBINS = 50
-REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
-          "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
-variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
-variables=['TEMP', 'PRESS','HUM','WSP','WDIR', 'WV', 'Cloud_T', 'Sky_T',  "DATE_DIF"]
-units = ["  [$^\circ C$]", "[mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]"," "," ","seg"]
-remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
-remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
 
 #---------------------------------------------------------Mica--------------------------------------------
+
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
 if MICAF is not None:
@@ -134,7 +121,27 @@ for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     print('p99: %s' % np.nanpercentile(df_all[var], 99))
     print('p10: %s' % np.nanpercentile(df_all[var], 10))
     print('----------------------------------------------------')
+
+
 #---------------------------------------------Master and Weather----------------------------------------------
+REPO_PATH_MW = os.getcwd()
+path = REPO_PATH_MW + '/data/master'
+OPATH_W = REPO_PATH_MW + '/output/weather'
+path_wea = REPO_PATH_MW + '/data/wea'
+OPATH_WEA = REPO_PATH_MW + '/output/wea'
+#DAY_TIME = [datetime.time(hour=10, minute=0), datetime.time(hour=22, minute=0)]  # daytime interval
+COL_NAMES_M= ["DAY", "HOUR(UT)", "Sky_T", "Amb_T", "WindS", "Hum%", "DewP", "C", "W", "R", "Cloud_T", "DATE_DIF", "WV"]
+COL_NAMES_WEA = ["DATE", "HOUR(UT)", "TEMP", "PRESS", "HUM", "WSP", "WDIR"]
+NBINS = 50
+REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
+          "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
+variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
+variables=['TEMP', 'PRESS','HUM','WSP','WDIR', 'WV', 'Cloud_T', 'Sky_T',  "DATE_DIF"]
+units = ["  [$^\circ C$]", "[mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]"," "," ","seg"]
+remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
+remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
+
+
 # create OPATH_W
 os.makedirs(OPATH, exist_ok=True)
 mf_master = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
@@ -153,7 +160,7 @@ df_all_master["Cloud_T"] = df_all_master["Sky_T"] - df_all_master["Amb_T"]
 df_all_master["DATE_DIF"] = df_all_master["DATE"].diff().dt.total_seconds()
 
 # remove values
-for var in COL_NAMES[2:]:
+for var in COL_NAMES_M[2:]:
     for i in REMOVE[var]:
         df_1 = df_all_master[df_all_master[var] <= i].index
         df_final = df_all_master.drop(df_1)
@@ -170,7 +177,7 @@ for g in mf_wea:
     df_wea['DATE_DIF'] = df_wea['DATE_TIME'].diff().dt.total_seconds()
     df_all_wea.append(df_wea)
 df_all_wea = pd.concat(df_all_wea, ignore_index=True)
-df_all_wea["WV"] = water_vapor(df_all_wea["Amb_T"], df_all_wea["Hum%"])
+df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 # creating df with day hours
 df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
@@ -212,5 +219,10 @@ df_combined.reset_index(inplace=True)
 ############################
 #CALCULAR Z:
 
-z = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
+#z = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
 
+#z range
+#for i in z range
+#using loc found in combined df and all df all the correspoindign rows
+#calculate the median of WSP and IMica
+#scatter plot Imica vs WSP
