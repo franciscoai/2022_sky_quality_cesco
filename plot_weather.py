@@ -97,6 +97,7 @@ for g in mf_wea:
 df_all_wea = pd.concat(df_all_wea, ignore_index=True)
 df_all_wea["WV"] = water_vapor(df_all["Amb_T"], df_all["Hum%"])
 
+
 # creating df with day hours
 df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
 
@@ -119,6 +120,7 @@ df_final.rename(columns = {'DAY':'DATE'}, inplace = True)
 df_final.rename(columns = {'Amb_T':'TEMP'}, inplace = True)
 df_final.rename(columns = {'Hum%':'HUM'}, inplace = True)
 df_final.rename(columns = {'WindS':'WSP'}, inplace = True)
+df_final["WV"] = water_vapor(df_final["TEMP"], df_final["HUM"])
 
 W=['TEMP', 'PRESS', 'HUM', 'WSP', 'WDIR','DATE_DIF', 'WV']
 for i in W:
@@ -148,8 +150,7 @@ for i in M:
     print("Min in master dataframe: ",min_m)
     print('Row count is:',len(df_final))
 days_m=len(df_final['DATE_TIME'].dt.date.unique())
-print("amount of days in master: ",days_w)
-
+print("amount of days in master: ",days_m)
 #Creating combined dataframe
 df_combined = pd.DataFrame
 df_combined = pd.concat([df_final,df_weather],ignore_index = True,sort = False)
@@ -168,80 +169,80 @@ j = 0
 
 
 
-# Ploting graphics
-# for i in variables:
-#     print(i)
-#     fig1, (ax1, ax2, ax3) = plt.subplots(3)
-#     fig1.set_size_inches(13, 4)
-#     median = []
-#     colors = '#e4e8f0'
-#     for m in months:
-#         tot = df_combined.loc[(df_combined['DATE_TIME'].dt.month == m) & (pd.notna(df_combined[i])), i]
-#         median.append(tot)
+#Ploting graphics
+for i in variables:
+    print(i)
+    fig1, (ax1, ax2, ax3) = plt.subplots(3)
+    fig1.set_size_inches(13, 4)
+    median = []
+    colors = '#e4e8f0'
+    for m in months:
+        tot = df_combined.loc[(df_combined['DATE_TIME'].dt.month == m) & (pd.notna(df_combined[i])), i]
+        median.append(tot)
     
-#     ax1 = plt.subplot(1, 3, 1)
-#     bp = ax1.boxplot(median, showfliers=False, patch_artist = True)
-#     for median in bp['medians']:
-#         median.set(color ='black',linewidth = 3)
-#     for patch in bp['boxes']:
-#         patch.set_facecolor(color = 'white')
-#     ax1.set_ylabel(i+units[j])
-#     ax1.set_xticks(months)
-#     ax1.set_xticklabels(months)
-#     ax1.minorticks_on()
-#     ax1.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
-#     ax1.yaxis.grid(True, which='major')
-#     ax1.xaxis.set_tick_params(which='minor', bottom=False)
-#     ax1.set_xlabel('Month')
+    ax1 = plt.subplot(1, 3, 1)
+    bp = ax1.boxplot(median, showfliers=False, patch_artist = True)
+    for median in bp['medians']:
+        median.set(color ='black',linewidth = 3)
+    for patch in bp['boxes']:
+        patch.set_facecolor(color = 'white')
+    ax1.set_ylabel(i+units[j])
+    ax1.set_xticks(months)
+    ax1.set_xticklabels(months)
+    ax1.minorticks_on()
+    ax1.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
+    ax1.yaxis.grid(True, which='major')
+    ax1.xaxis.set_tick_params(which='minor', bottom=False)
+    ax1.set_xlabel('Month')
 
-#     # Ploting Year median and standar deviation
-#     median_y = []
-#     for y in years:
-#         total = df_combined.loc[(df_combined['DATE_TIME'].dt.year == y) & (pd.notna(df_combined[i])), i]
-#         median_y.append(total)
-#     ax2 = plt.subplot(1, 3, 2)
-#     nyear = np.arange(len(years))
-#     bp2 = ax2.boxplot(median_y, showfliers=False, patch_artist = True)
-#     for median in bp2['medians']:
-#         median.set(color ='black',linewidth = 3)
-#     for patch in bp2['boxes']:
-#         patch.set_facecolor(color = 'white')  
-#     ax2.set_ylabel(i+units[j])
-#     ax2.set_xlabel('Year from 00')
-#     ax2.set_xticks(nyear[::2])
-#     ax2.minorticks_on()
-#     ax2.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
-#     ax2.yaxis.grid(True, which='Major')
-#     ax2.xaxis.set_tick_params(which='minor', bottom=False)
+    # Ploting Year median and standar deviation
+    median_y = []
+    for y in years:
+        total = df_combined.loc[(df_combined['DATE_TIME'].dt.year == y) & (pd.notna(df_combined[i])), i]
+        median_y.append(total)
+    ax2 = plt.subplot(1, 3, 2)
+    nyear = np.arange(len(years))
+    bp2 = ax2.boxplot(median_y, showfliers=False, patch_artist = True)
+    for median in bp2['medians']:
+        median.set(color ='black',linewidth = 3)
+    for patch in bp2['boxes']:
+        patch.set_facecolor(color = 'white')  
+    ax2.set_ylabel(i+units[j])
+    ax2.set_xlabel('Year from 00')
+    ax2.set_xticks(nyear[::2])
+    ax2.minorticks_on()
+    ax2.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
+    ax2.yaxis.grid(True, which='Major')
+    ax2.xaxis.set_tick_params(which='minor', bottom=False)
 
-#     # Ploting cumulative histogram
+    # Ploting cumulative histogram
 
-#     val_medio=round(df_combined[i].mean(),1)
-#     mediana=round(df_combined[i].median(),1)
-#     max= round(df_combined[i].max(),1)
-#     min=round(df_combined[i].min(),1)
+    val_medio=round(df_combined[i].mean(),1)
+    mediana=round(df_combined[i].median(),1)
+    max= round(df_combined[i].max(),1)
+    min=round(df_combined[i].min(),1)
     
-#     c = df_combined.loc[(pd.notna(df_combined[i])), i]
-#     w= df_combined.loc[(pd.notna(df_combined[i])), "DATE_DIF"]
+    c = df_combined.loc[(pd.notna(df_combined[i])), i]
+    w= df_combined.loc[(pd.notna(df_combined[i])), "DATE_DIF"]
    
-#     ax3 = plt.subplot(1, 3, 3)
-#     ax3.hist(c, density=True,cumulative =True, color="grey", bins=NBINS, log=False)
-#     ax3.set_xlabel(i+units[j])
-#     ax3.minorticks_on()
-#     ax3.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
-#     ax3.yaxis.grid(True, which='Major')
-#     ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
-#     ax3.xaxis.grid(True, which='Major')
-#     # ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
-#     # ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
-#     # ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
-#     # ax3.text(0.4,0.4,"Median: "+str(mediana), transform=ax3.transAxes,fontsize = 12)
-#     plt.tight_layout()
-#     plt.savefig(OPATH+'/'+i, dpi=300)
-#     plt.close()
-#     j=j+1
-#     # print("Mean in combined dataframe: ",val_medio)
-#     # print("Median in combined dataframe: ",mediana)
-#     # print("Max in combined dataframe: ",max)
-#     # print("Min in combined dataframe: ",min)
+    ax3 = plt.subplot(1, 3, 3)
+    ax3.hist(c, density=True,cumulative =True, color="grey", bins=NBINS, log=False)
+    ax3.set_xlabel(i+units[j])
+    ax3.minorticks_on()
+    ax3.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
+    ax3.yaxis.grid(True, which='Major')
+    ax3.xaxis.grid(which="minor", linestyle=':', linewidth=0.7)
+    ax3.xaxis.grid(True, which='Major')
+    # ax3.text(0.4,0.55, "Min: "+str(min), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.5,"Max: "+str(max), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.45,"Mean value:  "+str(val_medio), transform=ax3.transAxes,fontsize = 12)
+    # ax3.text(0.4,0.4,"Median: "+str(mediana), transform=ax3.transAxes,fontsize = 12)
+    plt.tight_layout()
+    plt.savefig(OPATH+'/'+i, dpi=300)
+    plt.close()
+    j=j+1
+    # print("Mean in combined dataframe: ",val_medio)
+    # print("Median in combined dataframe: ",mediana)
+    # print("Max in combined dataframe: ",max)
+    # print("Min in combined dataframe: ",min)
 
