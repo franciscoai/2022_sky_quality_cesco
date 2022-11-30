@@ -18,7 +18,7 @@ from water_vapor import water_vapor
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
+MICAF = 'mica_hourly' # 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']
 # ,'201201', '201202', '201204', '201205', '201206']  # months to delete
@@ -31,12 +31,14 @@ COL_UNITS = {'Date': '', 'Sky-T': '[mV]', 'Sun-T': '[mV]', 'Sky-T/Sun-T': '',
 # {'Sky-T': [4.91499996, 0.0], 'Sun-T': [0.0]}  # delete these values
 DEL_VAL = {'Sky-T': [4.91499996], 'Sun-T': [], 'Sky-T/Sun-T': []}
 MIN_VAL = {'Sky-T': [], 'Sun-T': [], 'Sky-T/Sun-T': []}  # delet all values below these
+
+PLT_LIM = {'Sky-T':[5,0.5], 'Sun-T':[3.25,0.25], 'Imica':[120,5], 'date_diff':[20,1]}
 matplotlib.rc('font', size=12)  # font size
 BWIDTH = 0.45
 DPI = 300.  # image dpi
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
 CAL_EQ = [1.63, 49.01]  # for Fe XIV C at 6 Sr # [2.83, 47.55]  # for Fe XIV L at 6 Sr
-SCATTER_LIGHT = 1.0  # in ppm
+SCATTER_LIGHT = 0.7 # in ppm
 SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
 SCIFMT = '{:4.2f}'
 
@@ -134,8 +136,9 @@ if MICAF == 'mica_hourly':
             plt.scatter(x, y, marker='.', s=1, label=yyyymmdd)
         if var == 'Imica':
             plt.ylim([0, 120])
-        plt.xlabel('Hour of the day')
+        plt.xlabel('Time of day [UTC]')
         plt.ylabel(df_all[var].name + ' ' + COL_UNITS[var])
+        plt.yticks(np.arange(0, PLT_LIM[var][0]+PLT_LIM[var][1], PLT_LIM[var][1]))
         plt.tight_layout()
         plt.grid(True)
         ax = plt.gca()
