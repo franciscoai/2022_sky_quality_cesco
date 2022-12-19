@@ -46,7 +46,7 @@ def medfilt(x, k):
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
 # 'mica_calibration'  # 'mica_vs_master'# 'mica_hourly' #'mica_vs_master'  # 'mica_hourly'  # ['19990222']
-MICAF = 'mica_hourly'  # 'mica_calibration'
+MICAF = None  # 'mica_hourly'  # 'mica_hourly'  # 'mica_calibration'
 # other options are: 'mica_hourly' to plot the same day in all years
 DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']  # months to delete
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
@@ -62,7 +62,10 @@ matplotlib.rc('font', size=12)  # font size
 DPI = 300.  # image dpi
 OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
-CAL_EQ = [9.77, 70.35]  # Linear eq to translate skyt/sunt -> ppm at 2 RS
+CAL_EQ = [1.63, 49.01]  # for Fe XIV C at 6 Sr # [2.83, 47.55]  # for Fe XIV L at 6 Sr
+SCATTER_LIGHT = 0.7  # in ppm
+NOISE_LIM = 0.04 # 0.019*2  # Change lower limit to consider it produced by a cloud
+VAR_TO_USE = 'Sun_T'  # to compute clear time
 
 # get all mica files
 mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
@@ -113,8 +116,11 @@ df_all['Sky_T_over_Sun_T'] = df_all['Sky_T']/df_all['Sun_T']
 COL_NAMES.append('Sky_T_over_Sun_T')
 
 # computes sky brigthness in ppm
-df_all['Sky_B2'] = CAL_EQ[1]*df_all['Sky_T_over_Sun_T']+CAL_EQ[0]
-COL_NAMES.append('Sky_B2')
+df_all['Imica'] = CAL_EQ[1]*df_all['Sky_T_over_Sun_T']+CAL_EQ[0]-SCATTER_LIGHT
+COL_NAMES.append('Imica')
+
+# sort by date
+df_all = df_all.sort_values(by='Date')
 
 # prints some info
 for var in np.array(COL_NAMES)[[1, 2, 4]]:
@@ -138,53 +144,66 @@ i = 0
 clear_time = []
 date_str = df_all['Date'].dt.strftime('%Y%m%d')
 for f in mf:
-    print(str(i)+' of '+str(len(mf)))
     yyyymmdd = f.split('/')[-1].split('.')[0]
     df = df_all[date_str == yyyymmdd]
-    df = df.resample('5s', base=30, label='right', on='Date')['Sun_T'].mean()
-    cond_int = []
-    for tint in range(0,len(df),60):
-        asign = np.sign(np.diff(df[tint:tint+60]))
-        signchange = ((np.roll(asign, 1) - asign) != 0).astype(int).sum()
-        if signchange >= 2:
-            cond_int.append(1)
-        else:
-            cond_int.append(0)
-    clear_time.append([yyyymmdd,(len(cond_int)-np.sum(cond_int))/(len(cond_int))])
-    breakpoint()
+    if len(df) > 10: 
+        duration = (df['Date'].iloc[-1] - df['Date'].iloc[0]).total_seconds()/3600.
+        if duration > 6:
+            #print('for ' + yyyymmdd)
+            df = df.resample('5s', label='right', on='Date')[VAR_TO_USE].mean()
+            cond_int = []
+            all_int = 0
+            for tint in range(0, len(df), 60):
+                asign = np.array(df[tint:tint+60])
+                asign = asign[~np.isnan(asign)]
+                if len(asign) > 0:
+                    asign = np.abs(np.max(asign) - np.min(asign))
+                    if asign > NOISE_LIM:
+                        cond_int.append(1)  # cloudy
+                    else:
+                        cond_int.append(0)  # clear
+                all_int += 1  # all intervals
+            cdate = datetime(int(yyyymmdd[0:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:8]), tzinfo=timezone.utc)
+            if (len(cond_int) != 0) and ((len(cond_int)/all_int) > 0.9):
+                ct = float(len(cond_int)-np.sum(cond_int))/(len(cond_int))
+                clear_time.append([cdate, ct])
+
+        # # plt.plot(df_all[date_str == yyyymmdd]['Date'][0:-1], np.diff(df_all[date_str == yyyymmdd][VAR_TO_USE]), '*k') # diff
+        # plt.plot(df_all[date_str == yyyymmdd]['Date'], (df_all[date_str == yyyymmdd][VAR_TO_USE]), '*k')
+        # # plt.yscale('log')
+        # plt.title(yyyymmdd + ' ; Clear Time='+'{:3.5f}'.format(ct))
+        # print(ct)
+        # #plt.ylim([0, 120])
+        # plt.show()
 
     i += 1
-
-
+clear_time = np.array(clear_time)
 # Plots
 print('Plotting...')
 os.makedirs(OPATH, exist_ok=True)
 
-# sky_b vs time
-fig = plt.figure(figsize=[10, 6])
-i = 0
-for f in fit_res[:, 0]:
-    strf = str(np.int32(f))
-    print(str(i)+' of '+str(np.size(fit_res[:, 0])))
-    df = df_all[date_str == strf]
-    x = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
-    y = df[var]  # signal.medfilt(df[var], kernel_size=9)  # FILTRO
-    a, b, t, chi2 = fit_res[i, 1:5]
-    x_line = np.arange(min(x), max(x), 1)
-    y_line = sky_b_func(x_line, a, b, t)
-    plt.scatter(x, y, marker='.', s=1, label=strf)
-    plt.plot(x_line, y_line, '--', color='red')
-    print(strf, a, b, t, chi2)
-    i += 1
-plt.xlabel('zenith_ang [Deg]')
-plt.ylabel(df_all[var].name + '[ppm]')
-plt.ylim([0, 120])
-# plt.xlim([20,22])
-lgnd = plt.legend(loc='lower right')
-for handle in lgnd.legendHandles:
-    handle.set_sizes([40.0])
+fig=plt.figure(figsize=[10, 6])
+plt.plot(clear_time[:, 0], clear_time[:, 1], '*k')
+plt.xlabel('Date')
+plt.ylabel('Clear time')
 plt.tight_layout()
 plt.grid(True)
-ax = plt.gca()
-plt.savefig(OPATH+'/'+var+'_zenith', dpi=DPI)
+ax=plt.gca()
+plt.savefig(OPATH+'/ct_vs_date', dpi=DPI)
 plt.close()
+
+# clear time hist
+fig=plt.figure(figsize=[10, 6])
+plt.hist(clear_time[:, 1], bins=100, log=True)
+plt.title('Median:'+'{:1.2f}'.format(np.median(clear_time[:, 1])))
+plt.xlabel('Clear time')
+plt.ylabel('Observec days')
+plt.tight_layout()
+plt.grid(True)
+ax=plt.gca()
+plt.savefig(OPATH+'/ct_hist', dpi=DPI)
+plt.close()
+
+# clear time vs date
+print('Number of days used:'+str(len(clear_time)))
+print('dates:', clear_time[0, 0], clear_time[-1, 0])

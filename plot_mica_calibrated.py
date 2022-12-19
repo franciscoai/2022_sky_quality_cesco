@@ -18,10 +18,12 @@ from water_vapor import water_vapor
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
-MICAF = 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
+# 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
+MICAF = None  # 'mica_hourly'
 # other options are: 'mica_hourly' to plot the same day in all years
-DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']
-# ,'201201', '201202', '201204', '201205', '201206']  # months to delete
+# , '201203', '201202', '201204', '201205', '201206']  # months to delete
+# , '201202', '201203', '201204', '201205', '201206']
+DEL_MICA_MONTHS = ['199906', '200507', '200508', '200509', '200510', '200511']
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
 MASTER_DIR = REPO_PATH + '/data/master'
 OPATH = REPO_PATH + '/output/mica_calibrated'
@@ -31,13 +33,15 @@ COL_UNITS = {'Date': '', 'Sky-T': '[mV]', 'Sun-T': '[mV]', 'Sky-T/Sun-T': '',
 # {'Sky-T': [4.91499996, 0.0], 'Sun-T': [0.0]}  # delete these values
 DEL_VAL = {'Sky-T': [4.91499996], 'Sun-T': [], 'Sky-T/Sun-T': []}
 MIN_VAL = {'Sky-T': [], 'Sun-T': [], 'Sky-T/Sun-T': []}  # delet all values below these
+
+PLT_LIM = {'Sky-T': [5, 0.5], 'Sun-T': [3.25, 0.25], 'Imica': [120, 5], 'date_diff': [20, 1]}
 matplotlib.rc('font', size=12)  # font size
 BWIDTH = 0.45
 DPI = 300.  # image dpi
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
 CAL_EQ = [1.63, 49.01]  # for Fe XIV C at 6 Sr # [2.83, 47.55]  # for Fe XIV L at 6 Sr
-SCATTER_LIGHT = 1.0  # in ppm
-SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
+SCATTER_LIGHT = 0.7  # in ppm
+SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # add to plot sunspot num vs Imica
 SCIFMT = '{:4.2f}'
 
 
@@ -53,8 +57,10 @@ if MICAF is not None:
     elif MICAF == 'mica_calibration':
         mf_cal = os.listdir(MICA_CAL_DIR)
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in mf_cal]
-    elif MICAF == 'mica_outlier':  # only 2012
-        mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2012']]
+    elif MICAF == 'mica_outlier2011':  # only 2012
+        mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2011', '2012']]
+    elif MICAF == 'mica_outlier1999':  # only 2012
+        mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['1999']]
     else:
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in MICAF]
 
@@ -65,6 +71,7 @@ ndays = 0
 for f in mf:
     yyyymmdd = f.split('/')[-1].split('.')[0]
     if yyyymmdd[0:6] not in DEL_MICA_MONTHS:
+        print('Reading ' + yyyymmdd)
         df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
         df['Date'] = [datetime(int(yyyymmdd[0:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:8])) +
                       timedelta(hours=h) for h in df['Date']]
@@ -134,8 +141,9 @@ if MICAF == 'mica_hourly':
             plt.scatter(x, y, marker='.', s=1, label=yyyymmdd)
         if var == 'Imica':
             plt.ylim([0, 120])
-        plt.xlabel('Hour of the day')
+        plt.xlabel('Time of day [UTC]')
         plt.ylabel(df_all[var].name + ' ' + COL_UNITS[var])
+        plt.yticks(np.arange(0, PLT_LIM[var][0]+PLT_LIM[var][1], PLT_LIM[var][1]))
         plt.tight_layout()
         plt.grid(True)
         ax = plt.gca()
@@ -159,14 +167,17 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     # vs date
     y = df_all[i]
     x = df_all["Date"]
-    plt.figure(figsize=[10, 6]) 
+    plt.figure(figsize=[10, 6])
     # tdf = df_all.resample('M', on='Date').quantile(0.7)
-    # plt.plot(tdf["Date"], tdf[i], '--', color='grey', label='Monthly p70 ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')    
+    # plt.plot(tdf["Date"], tdf[i], '--', color='grey', label='Monthly p70 ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
     tdf = df_all.resample('M', on='Date').median()
+    tdfq = df_all.resample('M', on='Date').quantile(0.1)
     tdf.reset_index(inplace=True)
-    plt.plot(tdf["Date"], tdf[i], color='black', label='Monthly median ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
-    tdf = df_all.resample('M', on='Date').quantile(0.1)
-    plt.plot(tdf["Date"], tdf[i], color='grey', label='Monthly p10 ('+SCIFMT.format(tdf[i].median())+' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
+    plt.plot(tdf["Date"], tdf[i], color='black', label='Monthly median ('+SCIFMT.format(tdf[i].median()) +
+             ' ; '+SCIFMT.format(tdf[i].min())+' ; '+SCIFMT.format(tdf[i].max())+')')
+
+    plt.plot(tdf["Date"], tdfq[i], color='grey', label='Monthly p10 ('+SCIFMT.format(tdfq[i].median()) +
+             ' ; '+SCIFMT.format(tdfq[i].min())+' ; '+SCIFMT.format(tdfq[i].max())+')')
 
     # if SUNSPOT_FILE is not None:
     #     with open(SUNSPOT_FILE, 'rb') as handle:
@@ -174,17 +185,51 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     #     sunspot = sunspot.resample('M', on='date').median()
     #     sunspot.reset_index(inplace=True)
     #     plt.plot(sunspot["date"], 40*sunspot['num']/sunspot['num'].max(),'--k', label='Norm sunspot monthly median')
-
     plt.xlabel(df_all["Date"].name)
     plt.ylabel(df_all[i].name + COL_UNITS[i])
     plt.tight_layout()
-    plt.ylim([0, 50])
+    #plt.ylim([0, 50])
     plt.minorticks_on()
-    plt.grid(visible=True, which='both')
+    plt.grid()  # visible=True, which='both')
     plt.legend()
     plt.savefig(OPATH+'/'+i+'_vs_date', dpi=DPI)
     plt.close()
 
+    # vs sunspot num
+    if SUNSPOT_FILE is not None and i=='Imica':
+        with open(SUNSPOT_FILE, 'rb') as handle:
+            sunspot = pickle.load(handle)
+        sunspot = sunspot.resample('M', on='date').median()
+        sunspot.reset_index(inplace=True)
+        common = np.intersect1d(tdf['Date'].dt.to_period('M'), sunspot['date'].dt.to_period('M'))
+        sunspot = sunspot.loc[[i in common for i in sunspot['date'].dt.to_period('M')]]  # keeps only common motnhs
+        tdf = tdf.loc[[i in common for i in tdf['Date'].dt.to_period('M')]]
+        plt.figure(figsize=[10, 6])
+        plt.scatter(sunspot['num'], tdf[i])
+        plt.xlabel('Sunspot number')
+        plt.ylabel(df_all[i].name + COL_UNITS[i])
+        plt.tight_layout()
+        plt.minorticks_on()
+        plt.grid()
+        plt.legend()
+        plt.savefig(OPATH+'/'+i+'_vs_sunspot', dpi=DPI)
+        plt.close()
+
+    # diff, to compute resolution
+    plt.figure(figsize=[10, 6])
+    ran = [-0.1, 0.1]
+    if i == 'Imica':
+        ran = [-0.1, 0.1]
+    plt.hist(df_all[i].diff(), bins=100, range=ran, log=True)
+    resol = df_all[i].diff().abs().sort_values()
+    resol = np.min(resol[resol > 0])
+    plt.title('Resolution: '+'{:2.4f}'.format(resol) + COL_UNITS[i])
+    plt.xlabel('Diff ' + df_all[i].name + COL_UNITS[i])
+    plt.ylabel('Freq.')
+    plt.savefig(OPATH+'/'+i+'_diff_hist', dpi=DPI)
+    plt.close()
+
+    # Multiplot with stats
     # monthly plot
     fig1, (ax1, ax2, ax3) = plt.subplots(3)
     fig1.set_size_inches(10, 10)
@@ -212,16 +257,18 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
 
     # Ploting Year median and standar deviation
     median_y = []
+    median_sunspot = []
     if SUNSPOT_FILE is not None:
         with open(SUNSPOT_FILE, 'rb') as handle:
             sunspot = pickle.load(handle)
-        median_sunspot = []
     for y in years:
         total = df_all.loc[(df_all['Date'].dt.year == y) & (df_all[i] != np.NAN), i]
         median_y.append(total)
         if SUNSPOT_FILE is not None:
             median_sunspot.append(sunspot.loc[(sunspot['date'].dt.year == y), 'num'].mean())
     ax2 = plt.subplot(2, 2, 2)
+    if i == 'Imica':
+        for_sctr = np.array([np.median(i) for i in median_y])
     bp2 = ax2.boxplot(median_y, showfliers=False, patch_artist=True, whis=[5, 95])
     for median in bp2['medians']:
         median.set(color='black', linewidth=3)
@@ -230,7 +277,7 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     if len(median_sunspot) > 0:
         median_sunspot = np.array(median_sunspot)
         x = np.arange(1, len(years)+1, 1)
-        ax2.plot(x, 40.*median_sunspot/median_sunspot.max(), '--.k')
+        #ax2.plot(x, 40.*median_sunspot/median_sunspot.max(), '--.k')
     ax2.set_ylabel(i+' ' + COL_UNITS[i])
     ax2.set_xlabel('Year')
     if i == 'Imica':
@@ -299,3 +346,14 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
     plt.tight_layout()
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
+
+fig = plt.figure(figsize=[10, 6])
+plt.scatter(median_sunspot, for_sctr)
+plt.ylabel('Yearly median Imica [ppm]')
+plt.xlabel('Yearly median Sunspot No.')
+plt.grid()
+#plt.xlim([0, 250])
+#plt.ylim([10, 30])
+plt.tight_layout()
+plt.savefig(OPATH+'/Imica_vs_sunspot_yearly', dpi=300)
+plt.close()
