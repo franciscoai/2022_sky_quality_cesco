@@ -18,6 +18,7 @@ from water_vapor import water_vapor
 from calendar import month
 import matplotlib.dates as mdates
 import pysolar.solar as solar
+from datetime import timezone
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
@@ -71,7 +72,7 @@ for f in mf:
     yyyymmdd = f.split('/')[-1].split('.')[0]
     if yyyymmdd[0:6] not in DEL_MICA_MONTHS:
         df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
-        df['Date'] = [datetime(int(yyyymmdd[0:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:8])) +
+        df['Date'] = [datetime(int(yyyymmdd[0:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:8]), tzinfo=timezone.utc) +
                       timedelta(hours=h) for h in df['Date']]
         df['date_diff'] = df['Date'].diff().dt.total_seconds()
         df.loc[df['date_diff'].isna(), 'date_diff'] = 0
@@ -101,26 +102,33 @@ for key in MIN_VAL:
 df_all['Imica'] = CAL_EQ[1]*df_all['Sky-T/Sun-T']+CAL_EQ[0]-SCATTER_LIGHT
 COL_NAMES.append('Imica')
 
-# sort by date
-df_all = df_all.sort_values(by='Date')
+#sort by date
+df_all = df_all.sort_values(by='Date', ignore_index=True)
 COL_NAMES.append('date_diff')
 
+#Resample mica
+df_all=df_all.resample('300S', on='Date').mean()
+df_all.reset_index(inplace=True)
+
+
+
+
 # prints some info
-for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
-    print(var+'-------------:')
-    print('Total number of files (days) read: %s' % ndays)
-    print('Total number of unique datres (days): %s' % np.size(df_all['Date'].dt.date.unique()))
-    print('Total number of data points: %s (%s days of net observation)' %
-          (len(df_all[var]), len(df_all[var])*5./3600./24.))
-    print('Mean: %s' % df_all[var].mean())
-    print('Median: %s' % df_all[var].median())
-    print('Std: %s' % df_all[var].std())
-    print('Min: %s at date %s' % (df_all[var].min(), df_all.loc[df_all[var].idxmin()]['Date']))
-    print('Max: %s at date %s' % (df_all[var].max(), df_all.loc[df_all[var].idxmin()]['Date']))
-    print('p90: %s' % np.nanpercentile(df_all[var], 90))
-    print('p99: %s' % np.nanpercentile(df_all[var], 99))
-    print('p10: %s' % np.nanpercentile(df_all[var], 10))
-    print('----------------------------------------------------')
+# for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
+#     print(var+'-------------:')
+#     print('Total number of files (days) read: %s' % ndays)
+#     print('Total number of unique datres (days): %s' % np.size(df_all['Date'].dt.date.unique()))
+#     print('Total number of data points: %s (%s days of net observation)' %
+#           (len(df_all[var]), len(df_all[var])*5./3600./24.))
+#     print('Mean: %s' % df_all[var].mean())
+#     print('Median: %s' % df_all[var].median())
+#     print('Std: %s' % df_all[var].std())
+#     print('Min: %s at date %s' % (df_all[var].min(), df_all.loc[df_all[var].idxmin()]['Date']))
+#     print('Max: %s at date %s' % (df_all[var].max(), df_all.loc[df_all[var].idxmin()]['Date']))
+#     print('p90: %s' % np.nanpercentile(df_all[var], 90))
+#     print('p99: %s' % np.nanpercentile(df_all[var], 99))
+#     print('p10: %s' % np.nanpercentile(df_all[var], 10))
+#     print('----------------------------------------------------')
 
 
 #---------------------------------------------Master and Weather----------------------------------------------
@@ -144,31 +152,18 @@ remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR
 
 # create OPATH_W
 os.makedirs(OPATH, exist_ok=True)
-<<<<<<< HEAD
-mfm = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
-
-# reading all files and converting to datetime
-df_all_master = []
-for f in mfm:
-    dfm = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES_M)
-    dfm["DAY"] = pd.to_datetime(dfm["DAY"], format="%Y%m%d")
-    dfm["HOUR(UT)"] = [timedelta(hours=h) for h in dfm['HOUR(UT)']]
-    dfm["DATE"] = dfm["DAY"]+dfm["HOUR(UT)"]
-    df_all_master.append(dfm)
-=======
 mf_master = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
 
 # reading all files and converting to datetime
 df_all_master = []
 for f in mf_master:
-    df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES)
+    df = pd.read_csv(f, delim_whitespace=True, skiprows=1, names=COL_NAMES_M)
     df["DAY"] = pd.to_datetime(df["DAY"], format="%Y%m%d")
-    df["HOUR(UT)"] = [datetime.timedelta(hours=h) for h in df['HOUR(UT)']]
+    df["HOUR(UT)"] = [timedelta(hours=h) for h in df['HOUR(UT)']]
     df["DATE"] = df["DAY"]+df["HOUR(UT)"]
     df_all_master.append(df)
->>>>>>> 070c853719c1a3401f63f1c7433f47cf492a8797
 df_all_master = pd.concat(df_all_master, ignore_index=True)
-
+df_all_master["DATE"] = df_all_master["DATE"].dt.tz_localize('UTC').dt.tz_convert("America/Argentina/San_Juan")
 df_all_master["Cloud_T"] = df_all_master["Sky_T"] - df_all_master["Amb_T"]
 df_all_master["DATE_DIF"] = df_all_master["DATE"].diff().dt.total_seconds()
 
@@ -190,10 +185,11 @@ for g in mf_wea:
     df_wea['DATE_DIF'] = df_wea['DATE_TIME'].diff().dt.total_seconds()
     df_all_wea.append(df_wea)
 df_all_wea = pd.concat(df_all_wea, ignore_index=True)
+df_all_wea["DATE_TIME"] = df_all_wea["DATE_TIME"].dt.tz_localize('UTC').dt.tz_convert("America/Argentina/San_Juan")
 df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 # creating df with day hours
-df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
+df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 21)]
 
 # remove values
 for var in variables_w:
@@ -206,15 +202,14 @@ for var in variables_w:
         df_3 = df_weather[df_weather[var] >= i].index
         df_weather= df_weather.drop(df_3)
 
-#Renaming and creating columns
-#df_final["ORIGIN"] = 'M'
-#df_weather["ORIGIN"] = "W"
+#Renaming columns
 df_final.rename(columns = {'DATE':'DATE_TIME'}, inplace = True)
 df_final.rename(columns = {'DAY':'DATE'}, inplace = True)
 df_final.rename(columns = {'Amb_T':'TEMP'}, inplace = True)
 df_final.rename(columns = {'Hum%':'HUM'}, inplace = True)
 df_final.rename(columns = {'WindS':'WSP'}, inplace = True)
 df_final["WV"] = water_vapor(df_final["TEMP"], df_final["HUM"])
+
 
 #Creating combined dataframe
 df_combined = pd.DataFrame
@@ -225,16 +220,31 @@ df_combined.drop(['R'], axis=1, inplace = True)
 df_combined.drop(['DewP'], axis=1, inplace = True)
 df_combined=df_combined.resample('300S', on='DATE_TIME').mean()
 df_combined.reset_index(inplace=True)
+df_combined=df_combined.dropna(subset=['TEMP'])
+
+df3 = df_all.loc[(df_all['Date'].dt.date).isin(df_combined['DATE_TIME'].dt.date)]
+df4 = df_combined.loc[(df_combined['DATE_TIME'].dt.date).isin(df_all['Date'].dt.date)]
+print(df3)
+print(df4)
+
+
+# CALCULAR Z:
+print("calculating z for Weather/Master files")
+df4['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df4['DATE_TIME']]
+# CALCULAR Z:
+print("calculating z for Mica files")
+df_all['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df_all['Date']]
+
+y= df3.loc[(df3["z"]>=0) & (df3["z"]<20)]
+x= df4.loc[(df4["z"]>=0) & (df4["z"]<20)]
+
+plt.scatter(x["WSP"], y["Imica"], c ="blue")
+plt.show()
 
 
 
 
-############################
-#CALCULAR Z:
-
-#z = [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df['Date']]
-
-#z range
+#for z in range
 #for i in z range
 #using loc found in combined df and all df all the correspoindign rows
 #calculate the median of WSP and IMica

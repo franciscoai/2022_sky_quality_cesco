@@ -209,7 +209,7 @@ for i in variables:
         patch.set_facecolor(color = 'white')  
     ax2.set_ylabel(i+units[j])
     ax2.set_xlabel('Year from 00')
-    ax2.set_xticks(nyear[::2])
+    ax2.set_xticks(years)
     ax2.minorticks_on()
     ax2.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax2.yaxis.grid(True, which='Major')
