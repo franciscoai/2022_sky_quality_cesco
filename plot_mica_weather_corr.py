@@ -20,6 +20,8 @@ import matplotlib.dates as mdates
 import pysolar.solar as solar
 from datetime import timezone
 
+print("server is woring..")
+
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
 MICAF = 'mica_hourly'  # 'mica_outlier'  # 'mica_outlier' 'mica_calibration'  # 'mica_hourly' #'mica_vs_master' # ['19990222']
