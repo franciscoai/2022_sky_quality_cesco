@@ -210,6 +210,7 @@ for i in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
         plt.ylabel(df_all[i].name + COL_UNITS[i])
         plt.tight_layout()
         plt.minorticks_on()
+        plt.ylim([12,23])
         plt.grid()
         plt.legend()
         plt.savefig(OPATH+'/'+i+'_vs_sunspot', dpi=DPI)

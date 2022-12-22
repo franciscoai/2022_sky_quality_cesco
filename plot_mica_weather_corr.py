@@ -191,7 +191,8 @@ df_all_wea["DATE_TIME"] = df_all_wea["DATE_TIME"].dt.tz_localize('UTC').dt.tz_co
 df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 # creating df with day hours
-df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 21)]
+df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 11) & (df_all_wea["DATE_TIME"].dt.hour < 23)]
+f_final = df_final.loc[(df_final["DATE"].dt.hour > 11) & (df_final["DATE"].dt.hour < 23)]
 
 # remove values
 for var in variables_w:
