@@ -23,7 +23,8 @@ REMOVE = {"Sky_T": [-990], "Amb_T": [], "WindS": [], "Hum%": [], "DewP": [],
           "C": [], "W": [], "R": [], "Cloud_T": [], "DATE_DIF": [], "WV": []}
 variables_w = ["TEMP", "PRESS", "HUM", "WSP", "WDIR", "WV", "DATE_DIF"]  # variables to plot
 variables=['TEMP', 'PRESS','HUM','WSP','WDIR', 'WV', 'Cloud_T', 'Sky_T',  "DATE_DIF"]
-units = ["  [$^\circ C$]", "[mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]"," "," ","seg"]
+units = ["  [$^\circ C$]", " [mm Hg]","  [%]","  [m$s^{-1}$]","  [Deg]","  [mm]", "  [$^\circ C$]"," [mV]","seg"]
+plot_lables=['Tempreature ', 'Pressure','Humidity','Wind Speed','Wind Dir.', 'Water Vapor', 'Cloud Temp.', 'Sky_T',  "DATE_DIF"]
 remove_weather_min = {"TEMP":[-20], "PRESS": [], "HUM": [0], "WSP": [0], "WDIR": [], "WV": [], "DATE_DIF": [0]}
 remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR": [], "WV": [], "DATE_DIF": [3600]}
 
@@ -51,37 +52,6 @@ for var in COL_NAMES[2:]:
         df_1 = df_all[df_all[var] <= i].index
         df_final = df_all.drop(df_1)
 
-
-
-# print("Creating Images...")
-
-# #plot all columns
-# for variable in COL_NAMES[2:]:
-#     # vs date
-#     x = df_final["DATE"]
-#     y = df_final[variable]
-#     plt.figure(figsize=[10, 6])
-#     plt.scatter(x, y, c='b',s=2)
-#     plt.xlabel(df_final["DATE"].name)
-#     plt.ylabel(df_final[variable].name)
-#     plt.tight_layout()
-#     if variable == "DATE_DIF":
-#         plt.ylim([0,140])
-#     plt.savefig(OPATH+'/'+variable, dpi=300)
-
-#     #ploting histogram
-#     plt.figure(figsize=[10, 6])
-#     if variable == "DATE_DIF":
-#         plt.hist(y, log=True, bins=NBINS, color='b', histtype='step', range=[0,140])
-#     else:
-#         )plt.hist(y, log=True, bins=NBINS, color='b', histtype='step')
-#     plt.grid()
-#     plt.ylabel('FREQUENCY')
-#     plt.xlabel(df_final[variable].name)
-#     plt.tight_layout()
-#     plt.savefig(OPATH+'/'+variable+'_hist', dpi=300)
-
-
 # reading weather data
 mf_wea = [os.path.join(path_wea, f) for f in os.listdir(path_wea) if f.endswith('.txt')]
 
@@ -98,8 +68,9 @@ df_all_wea = pd.concat(df_all_wea, ignore_index=True)
 df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 
-# creating df with day hours
-df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 9) & (df_all_wea["DATE_TIME"].dt.hour < 22)]
+# keeping only day time hours
+df_weather = df_all_wea.loc[(df_all_wea["DATE_TIME"].dt.hour > 11) & (df_all_wea["DATE_TIME"].dt.hour < 23)]
+df_final = df_final.loc[(df_final["DATE"].dt.hour > 11) & (df_final["DATE"].dt.hour < 23)]
 
 # remove values
 for var in variables_w:
@@ -122,35 +93,39 @@ df_final.rename(columns = {'Hum%':'HUM'}, inplace = True)
 df_final.rename(columns = {'WindS':'WSP'}, inplace = True)
 df_final["WV"] = water_vapor(df_final["TEMP"], df_final["HUM"])
 
-W=['TEMP', 'PRESS', 'HUM', 'WSP', 'WDIR','DATE_DIF', 'WV']
-for i in W:
-    print(i)
-    val_medio_w=round(df_weather[i].mean(),1)
-    mediana_w=round(df_weather[i].median(),1)
-    max_w= round(df_weather[i].max(),1)
-    min_w=round(df_weather[i].min(),1)
-    print("Mean in weather dataframe: ",val_medio_w)
-    print("Median in weather dataframe: ",mediana_w)
-    print("Max in weather dataframe: ",max_w)
-    print("Min in weather dataframe: ",min_w)
-    print('Row count is:',len(df_weather.index))
-days_w=len(df_weather['DATE_TIME'].dt.date.unique())
-print("amount of days in weather: ",days_w)
+W=['DATE_DIF']
+for var in W:
+    print(var+'--------WEATHER DFRAME-------------:')
+    print('Total number of unique dates (days): %s' % np.size(df_weather['DATE_TIME'].dt.date.unique()))
+    print('Total number of data points: %s (%s days of net observation)' %
+          (len(df_weather[var]), len(df_weather[var])*5./3600./24.))
+    print('Mean: %s' % df_weather[var].mean())
+    print('Median: %s' % df_weather[var].median())
+    print('Std: %s' % df_weather[var].std())
+    print('Min: %s at date %s' % (df_weather[var].min(), df_weather.loc[df_weather[var].idxmin()]['DATE_TIME']))
+    print('Max: %s at date %s' % (df_weather[var].max(), df_weather.loc[df_weather[var].idxmin()]['DATE_TIME']))
+    print('p90: %s' % np.nanpercentile(df_weather[var], 90))
+    print('p99: %s' % np.nanpercentile(df_weather[var], 99))
+    print('p10: %s' % np.nanpercentile(df_weather[var], 10))
 
-M=[ 'TEMP', 'HUM',  'WSP', 'Cloud_T', 'DATE_DIF', 'WV','Sky_T']
-for i in M:
-    print(i)
-    val_medio_m=round(df_final[i].mean(),1)
-    mediana_m=round(df_final[i].median(),1)
-    max_m= round(df_final[i].max(),1)
-    min_m=round(df_final[i].min(),1)
-    print("Mean in master dataframe: ",val_medio_m)
-    print("Median in master dataframe: ",mediana_m)
-    print("Max in master dataframe: ",max_m)
-    print("Min in master dataframe: ",min_m)
-    print('Row count is:',len(df_final))
-days_m=len(df_final['DATE_TIME'].dt.date.unique())
-print("amount of days in master: ",days_m)
+print('Date range:', df_weather['DATE_TIME'].min(), df_weather['DATE_TIME'].max())
+
+for var in W:
+    print(var+'------MASTER DFRAME-------------:')
+    print('Total number of unique dates (days): %s' % np.size(df_final['DATE_TIME'].dt.date.unique()))
+    print('Total number of data points: %s (%s days of net observation)' %
+          (len(df_final[var]), len(df_final[var])*5./3600./24.))
+    print('Mean: %s' % df_final[var].mean())
+    print('Median: %s' % df_final[var].median())
+    print('Std: %s' % df_final[var].std())
+    print('Min: %s at date %s' % (df_final[var].min(), df_final.loc[df_final[var].idxmin()]['DATE_TIME']))
+    print('Max: %s at date %s' % (df_final[var].max(), df_final.loc[df_final[var].idxmin()]['DATE_TIME']))
+    print('p90: %s' % np.nanpercentile(df_final[var], 90))
+    print('p99: %s' % np.nanpercentile(df_final[var], 99))
+    print('p10: %s' % np.nanpercentile(df_final[var], 10))
+    print('----------------------------------------------------')
+print('Date range:', df_final['DATE_TIME'].min(), df_final['DATE_TIME'].max())    
+
 #Creating combined dataframe
 df_combined = pd.DataFrame
 df_combined = pd.concat([df_final,df_weather],ignore_index = True,sort = False)
@@ -161,14 +136,26 @@ df_combined.drop(['DewP'], axis=1, inplace = True)
 df_combined=df_combined.resample('300S', on='DATE_TIME').mean()
 df_combined.reset_index(inplace=True)
 
-
+W=['TEMP', 'PRESS', 'HUM', 'WSP', 'WDIR', 'WV','DATE_DIF']
+for var in W:
+    print(var+'--------COMBINED DFRAME-------------:')
+    print('Total number of unique dates (days): %s' % np.size(df_weather['DATE_TIME'].dt.date.unique()))
+    print('Total number of data points: %s (%s days of net observation)' %
+          (len(df_weather[var]), len(df_weather[var])*5./3600./24.))
+    print('Mean: %s' % df_weather[var].mean())
+    print('Median: %s' % df_weather[var].median())
+    print('Std: %s' % df_weather[var].std())
+    print('Min: %s at date %s' % (df_weather[var].min(), df_weather.loc[df_weather[var].idxmin()]['DATE_TIME']))
+    print('Max: %s at date %s' % (df_weather[var].max(), df_weather.loc[df_weather[var].idxmin()]['DATE_TIME']))
+    print('p90: %s' % np.nanpercentile(df_weather[var], 90))
+    print('p99: %s' % np.nanpercentile(df_weather[var], 99))
+    print('p10: %s' % np.nanpercentile(df_weather[var], 10))
+print('Date range:', df_combined['DATE_TIME'].min(), df_combined['DATE_TIME'].max())
 
 months = df_combined['DATE_TIME'].dt.month.unique()
 years = np.sort(df_combined['DATE_TIME'].dt.year.unique())
+
 j = 0
-
-
-
 #Ploting graphics
 for i in variables:
     print(i)
@@ -186,7 +173,7 @@ for i in variables:
         median.set(color ='black',linewidth = 3)
     for patch in bp['boxes']:
         patch.set_facecolor(color = 'white')
-    ax1.set_ylabel(i+units[j])
+    ax1.set_ylabel(plot_lables[j]+units[j])
     ax1.set_xticks(months)
     ax1.set_xticklabels(months)
     ax1.minorticks_on()
@@ -207,16 +194,17 @@ for i in variables:
         median.set(color ='black',linewidth = 3)
     for patch in bp2['boxes']:
         patch.set_facecolor(color = 'white')  
-    ax2.set_ylabel(i+units[j])
-    ax2.set_xlabel('Year from 00')
-    ax2.set_xticks(years)
+    ax2.set_ylabel(plot_lables[j]+units[j])
+    ax2.set_xticklabels([str(y)[2:4] for y in years])
     ax2.minorticks_on()
     ax2.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax2.yaxis.grid(True, which='Major')
     ax2.xaxis.set_tick_params(which='minor', bottom=False)
+    plt.xticks(rotation = 45)
+    ax2.set_xlabel('Year')
+
 
     # Ploting cumulative histogram
-
     val_medio=round(df_combined[i].mean(),1)
     mediana=round(df_combined[i].median(),1)
     max= round(df_combined[i].max(),1)
@@ -227,7 +215,7 @@ for i in variables:
    
     ax3 = plt.subplot(1, 3, 3)
     ax3.hist(c, density=True,cumulative =True, color="grey", bins=NBINS, log=False)
-    ax3.set_xlabel(i+units[j])
+    ax3.set_xlabel(plot_lables[j]+units[j])
     ax3.minorticks_on()
     ax3.yaxis.grid(which="minor", linestyle=':', linewidth=0.7)
     ax3.yaxis.grid(True, which='Major')
@@ -241,8 +229,7 @@ for i in variables:
     plt.savefig(OPATH+'/'+i, dpi=300)
     plt.close()
     j=j+1
-    # print("Mean in combined dataframe: ",val_medio)
-    # print("Median in combined dataframe: ",mediana)
-    # print("Max in combined dataframe: ",max)
-    # print("Min in combined dataframe: ",min)
+
+
+
 

@@ -64,7 +64,7 @@ OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location 
 MICA_CAL_DIR = '/media/sf_iglesias_data/cesco_sky_quality/MICA_processed/AvgGifs'
 CAL_EQ = [1.63, 49.01]  # for Fe XIV C at 6 Sr # [2.83, 47.55]  # for Fe XIV L at 6 Sr
 SCATTER_LIGHT = 0.7  # in ppm
-NOISE_LIM = 0.04 # 0.019*2  # Change lower limit to consider it produced by a cloud
+NOISE_LIM = 0.039 # 0.019*2  # Change lower limit to consider it produced by a cloud
 VAR_TO_USE = 'Sun_T'  # to compute clear time
 
 # get all mica files
@@ -149,7 +149,6 @@ for f in mf:
     if len(df) > 10: 
         duration = (df['Date'].iloc[-1] - df['Date'].iloc[0]).total_seconds()/3600.
         if duration > 6:
-            #print('for ' + yyyymmdd)
             df = df.resample('5s', label='right', on='Date')[VAR_TO_USE].mean()
             cond_int = []
             all_int = 0
@@ -167,6 +166,7 @@ for f in mf:
             if (len(cond_int) != 0) and ((len(cond_int)/all_int) > 0.9):
                 ct = float(len(cond_int)-np.sum(cond_int))/(len(cond_int))
                 clear_time.append([cdate, ct])
+                print('day ' + yyyymmdd + ';  ctf: '+ str(ct))
 
         # # plt.plot(df_all[date_str == yyyymmdd]['Date'][0:-1], np.diff(df_all[date_str == yyyymmdd][VAR_TO_USE]), '*k') # diff
         # plt.plot(df_all[date_str == yyyymmdd]['Date'], (df_all[date_str == yyyymmdd][VAR_TO_USE]), '*k')
