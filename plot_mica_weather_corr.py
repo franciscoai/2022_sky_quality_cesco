@@ -20,7 +20,6 @@ import matplotlib.dates as mdates
 import pysolar.solar as solar
 from datetime import timezone
 
-print("server is woring..")
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
@@ -83,7 +82,6 @@ for f in mf:
 
 df_all = pd.concat(df_all, ignore_index=True)
 
-
 # adds column with Sky-T/Sun-T
 df_all['Sky-T/Sun-T'] = df_all['Sky-T']/df_all['Sun-T']
 COL_NAMES.append('Sky-T/Sun-T')
@@ -103,7 +101,6 @@ for key in MIN_VAL:
 # computes sky brigthness in ppm
 df_all['Imica'] = CAL_EQ[1]*df_all['Sky-T/Sun-T']+CAL_EQ[0]-SCATTER_LIGHT
 COL_NAMES.append('Imica')
-
 #sort by date
 df_all = df_all.sort_values(by='Date', ignore_index=True)
 COL_NAMES.append('date_diff')
@@ -111,28 +108,6 @@ COL_NAMES.append('date_diff')
 #Resample mica
 df_all=df_all.resample('300S', on='Date').mean()
 df_all.reset_index(inplace=True)
-
-
-
-
-# prints some info
-# for var in ['Sky-T', 'Sun-T', 'Imica', 'date_diff']:
-#     print(var+'-------------:')
-#     print('Total number of files (days) read: %s' % ndays)
-#     print('Total number of unique datres (days): %s' % np.size(df_all['Date'].dt.date.unique()))
-#     print('Total number of data points: %s (%s days of net observation)' %
-#           (len(df_all[var]), len(df_all[var])*5./3600./24.))
-#     print('Mean: %s' % df_all[var].mean())
-#     print('Median: %s' % df_all[var].median())
-#     print('Std: %s' % df_all[var].std())
-#     print('Min: %s at date %s' % (df_all[var].min(), df_all.loc[df_all[var].idxmin()]['Date']))
-#     print('Max: %s at date %s' % (df_all[var].max(), df_all.loc[df_all[var].idxmin()]['Date']))
-#     print('p90: %s' % np.nanpercentile(df_all[var], 90))
-#     print('p99: %s' % np.nanpercentile(df_all[var], 99))
-#     print('p10: %s' % np.nanpercentile(df_all[var], 10))
-#     print('----------------------------------------------------')
-
-
 #---------------------------------------------Master and Weather----------------------------------------------
 REPO_PATH_MW = os.getcwd()
 path = REPO_PATH_MW + '/data/master'
@@ -225,30 +200,72 @@ df_combined=df_combined.resample('300S', on='DATE_TIME').mean()
 df_combined.reset_index(inplace=True)
 df_combined=df_combined.dropna(subset=['TEMP'])
 
+
 df3 = df_all.loc[(df_all['Date'].dt.date).isin(df_combined['DATE_TIME'].dt.date)]
-df4 = df_combined.loc[(df_combined['DATE_TIME'].dt.date).isin(df_all['Date'].dt.date)]
-print(df3)
-print(df4)
-
-
-# CALCULAR Z:
+df3=df3.dropna(subset=['Imica'])
+df4 = df_combined.loc[(df_combined['DATE_TIME'].dt.date).isin(df3['Date'].dt.date)]
+# CALCULAR z:
 print("calculating z for Weather/Master files")
 df4['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df4['DATE_TIME']]
-# CALCULAR Z:
+# CALCULAR z:
 print("calculating z for Mica files")
-df_all['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df_all['Date']]
+df3['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df3['Date']]
 
-y= df3.loc[(df3["z"]>=0) & (df3["z"]<20)]
-x= df4.loc[(df4["z"]>=0) & (df4["z"]<20)]
-
-plt.scatter(x["WSP"], y["Imica"], c ="blue")
-plt.show()
+print("calculating z for the first range")
+df_y= df3.loc[(df3["z"]>=0) & (df3["z"]<10)]
+df_x= df4.loc[(df4["z"]>=0) & (df4["z"]<10)]
 
 
+print("calculating range")
+
+a=float(8)
+b=float(8.1)
+d=0
+df_y1=pd.DataFrame()
+df_y2=pd.DataFrame()
+print(df_y)
+for i in (df_y["Date"].dt.date.unique()):
+    print("Date: ",i)
+    a=0
+    b=0
+    c=0
+    for j in range(0,1):
+        y = df_y.loc[(df_y["z"]>=a) & (df_y["z"]<b)]
+        print("y: ",y)
+        df_y1.append(y)
+        c=c+1
+        a = a+0.1
+        b = b+0.1
+        print("a: ", a)
+        print("b: ", b)
+        print("vueltas: ", c)
+        # if len(df_y1)!=0:
+        #     print("lenght",len(df_y1))  
+        #     y_med= df_y1["z"].median()
+        #     df_y2.append(y_med)
+        #     df_y1=[]
+    
+        # else:
+        #     df_y1=[]
+        #     continue
+    d=d+1
+print(d)
+           
+print(df_y1)
+
+print("Done...")
 
 
-#for z in range
-#for i in z range
-#using loc found in combined df and all df all the correspoindign rows
-#calculate the median of WSP and IMica
-#scatter plot Imica vs WSP
+
+
+# #plt.scatter(x["WSP"], y["Imica"], c ="blue")
+# #plt.show()
+
+
+
+
+# #for z in range
+# #for i in z range
+# #using loc found in combined df and all df all the correspoindign rows
+# #calculate the median of WSP and IMica
+# #scatter plot Imica vs WSP
