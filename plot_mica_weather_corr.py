@@ -19,7 +19,7 @@ from calendar import month
 import matplotlib.dates as mdates
 import pysolar.solar as solar
 from datetime import timezone
-
+import seaborn as sns
 
 REPO_PATH = os.getcwd()
 # 'mica_hourly'  # [str(i)+'0217' for i in range(1997,2013,1)] # Full dates to plot, set to None to plot all
@@ -29,7 +29,7 @@ DEL_MICA_MONTHS = ['200507', '200508', '200509', '200510', '200511']
 # ,'201201', '201202', '201204', '201205', '201206']  # months to delete
 MICA_DIR = REPO_PATH + '/data/mica/Sky_Tes_1997_2012'
 MASTER_DIR = REPO_PATH + '/data/master'
-OPATH = REPO_PATH + '/output/mica_calibrated'
+OPATH = REPO_PATH + '/output/mica_wather_corr'
 COL_NAMES = ['Date', 'Sky-T', 'Sun-T']
 COL_UNITS = {'Date': '', 'Sky-T': '[mV]', 'Sun-T': '[mV]', 'Sky-T/Sun-T': '',
              'sky_class': '', 'date_diff': '[s]', 'Imica': '[ppm]'}  # units incl a blank space
@@ -46,13 +46,16 @@ SUNSPOT_FILE = REPO_PATH + '/data/sunspot_num.pickle'  # to overplot sunspot num
 SCIFMT = '{:4.2f}'
 OAFA_LOC = [-31+48/60.+8.5/3600, -69+19/60.+35.6/3600., 2370.]  # oafa location lat, long, height [m]
 
+
 #---------------------------------------------------------Mica--------------------------------------------
 
 # get all mica files
-mf = [os.path.join(MICA_DIR, f) for f in os.listdir(MICA_DIR) if f.endswith('.txt')]
+files=np.sort(os.listdir(MICA_DIR))
+mf = [os.path.join(MICA_DIR, f) for f in files  if f.endswith('.txt')]
+mf= np.sort(mf)
 if MICAF is not None:
     if MICAF == 'mica_hourly':
-        allf = [str.split(i, '.')[0] for i in os.listdir(MICA_DIR)]
+        allf = [str.split(i, '.')[0] for i in files]
         allf = [i[4:8] for i in allf]
         # find daates that are in at least 14 years
         allf = [i for i in allf if allf.count(i) > 14]
@@ -64,6 +67,7 @@ if MICAF is not None:
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0][0:4] in ['2012']]
     else:
         mf = [i for i in mf if str.split(os.path.basename(i), '.')[0] in MICAF]
+
 
 # read the space separated files with pandas
 df_all = []
@@ -104,10 +108,11 @@ COL_NAMES.append('Imica')
 #sort by date
 df_all = df_all.sort_values(by='Date', ignore_index=True)
 COL_NAMES.append('date_diff')
-
 #Resample mica
 df_all=df_all.resample('300S', on='Date').mean()
 df_all.reset_index(inplace=True)
+
+
 #---------------------------------------------Master and Weather----------------------------------------------
 REPO_PATH_MW = os.getcwd()
 path = REPO_PATH_MW + '/data/master'
@@ -128,7 +133,7 @@ remove_weather_max = {"TEMP":[40], "PRESS": [], "HUM": [150], "WSP": [40], "WDIR
 
 
 # create OPATH_W
-os.makedirs(OPATH, exist_ok=True)
+os.makedirs(OPATH_W, exist_ok=True)
 mf_master = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('_wea.txt')]
 
 # reading all files and converting to datetime
@@ -140,7 +145,7 @@ for f in mf_master:
     df["DATE"] = df["DAY"]+df["HOUR(UT)"]
     df_all_master.append(df)
 df_all_master = pd.concat(df_all_master, ignore_index=True)
-df_all_master["DATE"] = df_all_master["DATE"].dt.tz_localize('UTC').dt.tz_convert("America/Argentina/San_Juan")
+df_all_master["DATE"] = df_all_master["DATE"].dt.tz_localize('UTC')
 df_all_master["Cloud_T"] = df_all_master["Sky_T"] - df_all_master["Amb_T"]
 df_all_master["DATE_DIF"] = df_all_master["DATE"].diff().dt.total_seconds()
 
@@ -162,7 +167,7 @@ for g in mf_wea:
     df_wea['DATE_DIF'] = df_wea['DATE_TIME'].diff().dt.total_seconds()
     df_all_wea.append(df_wea)
 df_all_wea = pd.concat(df_all_wea, ignore_index=True)
-df_all_wea["DATE_TIME"] = df_all_wea["DATE_TIME"].dt.tz_localize('UTC').dt.tz_convert("America/Argentina/San_Juan")
+df_all_wea["DATE_TIME"] = df_all_wea["DATE_TIME"].dt.tz_localize('UTC') 
 df_all_wea["WV"] = water_vapor(df_all_wea["TEMP"], df_all_wea["HUM"])
 
 # creating df with day hours
@@ -204,6 +209,7 @@ df_combined=df_combined.dropna(subset=['TEMP'])
 df3 = df_all.loc[(df_all['Date'].dt.date).isin(df_combined['DATE_TIME'].dt.date)]
 df3=df3.dropna(subset=['Imica'])
 df4 = df_combined.loc[(df_combined['DATE_TIME'].dt.date).isin(df3['Date'].dt.date)]
+
 # CALCULAR z:
 print("calculating z for Weather/Master files")
 df4['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df4['DATE_TIME']]
@@ -212,60 +218,29 @@ print("calculating z for Mica files")
 df3['z']= [90. - solar.get_altitude(OAFA_LOC[0], OAFA_LOC[1],  d.to_pydatetime()) for d in df3['Date']]
 
 print("calculating z for the first range")
-df_y= df3.loc[(df3["z"]>=0) & (df3["z"]<10)]
-df_x= df4.loc[(df4["z"]>=0) & (df4["z"]<10)]
-
-
-print("calculating range")
-
-a=float(8)
-b=float(8.1)
-d=0
-df_y1=pd.DataFrame()
-df_y2=pd.DataFrame()
-print(df_y)
-for i in (df_y["Date"].dt.date.unique()):
-    print("Date: ",i)
-    a=0
-    b=0
-    c=0
-    for j in range(0,1):
-        y = df_y.loc[(df_y["z"]>=a) & (df_y["z"]<b)]
-        print("y: ",y)
-        df_y1.append(y)
-        c=c+1
-        a = a+0.1
-        b = b+0.1
-        print("a: ", a)
-        print("b: ", b)
-        print("vueltas: ", c)
-        # if len(df_y1)!=0:
-        #     print("lenght",len(df_y1))  
-        #     y_med= df_y1["z"].median()
-        #     df_y2.append(y_med)
-        #     df_y1=[]
-    
-        # else:
-        #     df_y1=[]
-        #     continue
-    d=d+1
-print(d)
-           
-print(df_y1)
+rng_coarse=np.arange(0,100,10)
+stp = 0.1
+var=['WSP','TEMP', 'HUM','WV']
+for v in var:
+    for l in range(len(rng_coarse)-1):
+        rng=np.arange(rng_coarse[l],rng_coarse[l+1],stp)
+        df_y = []
+        df_x = []
+        for i in (df3["Date"].dt.date.unique()):
+            for s in rng:
+                bla_y = df3.loc[(df3["z"] >= s) & (df3["z"] < s+stp) & (df3["Date"].dt.date == i)]
+                bla_x = df4.loc[(df4["z"] >= s) & (df4["z"] < s+stp) & (df4["DATE_TIME"].dt.date == i)]
+                if len(bla_x)>0 and len(bla_y)>0:
+                    df_x.append(np.median(bla_x[v]))
+                    df_y.append(np.median(bla_y['Imica']))
+        fig=plt.figure()
+        ax=fig.add_subplot(111)
+        ax.scatter(df_x,df_y)
+        ax.set_xlabel(v)
+        ax.set_ylabel("Imica")
+        plt.yscale('log')
+        OPATH_VAR= OPATH+'/'+v
+        plt.savefig(OPATH_VAR+'/'+str(rng_coarse[l])+"-"+str(rng_coarse[l+1]), dpi=300)
+        plt.close()
 
 print("Done...")
-
-
-
-
-# #plt.scatter(x["WSP"], y["Imica"], c ="blue")
-# #plt.show()
-
-
-
-
-# #for z in range
-# #for i in z range
-# #using loc found in combined df and all df all the correspoindign rows
-# #calculate the median of WSP and IMica
-# #scatter plot Imica vs WSP
